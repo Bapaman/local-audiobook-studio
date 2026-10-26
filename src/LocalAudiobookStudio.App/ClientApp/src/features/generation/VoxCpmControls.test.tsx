@@ -1,0 +1,200 @@
+import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { StudioClient } from '../../api/client';
+import type { JobSnapshot, SnapshotResponse, VoxCpmTrainingSnapshot } from '../../api/types';
+import { GenerationPanel } from './GenerationPanel';
+import { useProjectEvents } from './useProjectEvents';
+import { TestEventSource } from '../../test-events';
+
+const model = 'a'.repeat(32), otherModel = 'b'.repeat(32), clip = 'c'.repeat(32), otherClip = 'd'.repeat(32);
+const defaults = { seed: 42, timesteps: 10, cfg: 2, tempoPercent: 100, useReference: true, referenceClipId: null };
+const current: SnapshotResponse = { etag: '"2"', snapshot: { id: 'book1', displayName: 'Книга', revision: 2,
+  voiceRecording: { artifactId: 'record1', sha256: 'hash', byteLength: 1, durationMilliseconds: 392034, hasClippingWarning: false },
+  voiceAnchor: { artifactId: 'anchor1', startMilliseconds: 0, endMilliseconds: 12000, transcript: 'Образец.' },
+  textDocument: { sourceKind: 'Paste', displayName: 'Текст', encoding: 'utf-8', sha256: 'hash', byteCount: 1, originalText: 'Фраза.', normalizedText: 'Фраза.' },
+  segments: [{ id: 's1', order: 0, originalText: 'Фраза.', normalizedText: 'Фраза.', spokenText: 'Фраза.', contentHash: 'hash', status: 'pending' }] } };
+const vox: VoxCpmTrainingSnapshot = { id: 'train1', projectId: 'book1', revision: 2, state: 'paused', phase: 'paused',
+  corpusVersionId: 'version1', corpusManifestSha256: 'hash', corpusClipCount: 2, retainedDurationSeconds: 24, globalStep: 29, completedEpochs: 1,
+  nextRetainedOrdinal: 1, nextClipId: clip, targetCompletedEpochs: 2, executionId: 'execution1', canResume: true, qualityEstablished: false,
+  diagnosticCode: null, createdUtc: '', updatedUtc: '', models: [model, otherModel].map(id => ({ id, trainingId: 'train1', corpusVersionId: 'version1', manifestSha256: 'hash', globalStep: 29, completedEpochs: 1, createdUtc: '' })) };
+const runtime = { ready: true, experimental: true, diagnosticCode: null, profileId: 'voxcpm2-saved-adapter-cpu-v1' };
+const catalog = (id = model, idClip = clip) => ({ modelId: id, corpusVersionId: 'version1', defaultClipId: idClip, clips: [{ id: idClip, trainingOrdinal: 0, seconds: 12, text: 'Подтверждённый текст.' }] });
+const generation = () => ({ jobs: [] as JobSnapshot[], readiness: { ...runtime, profileId: 'q8-f16-cpu' }, voxReadiness: runtime, pending: false, error: '', connected: true, enqueue: vi.fn().mockResolvedValue(undefined), control: vi.fn().mockResolvedValue(undefined) });
+function serveReferences() {
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => new Response(JSON.stringify(catalog(path.includes(otherModel) ? otherModel : model, path.includes(otherModel) ? otherClip : clip)))));
+}
+async function select(user = userEvent.setup()) {
+  await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), `voxcpm:${model}`);
+  await screen.findByRole('option', { name: /Подтверждённый текст/ });
+  return user;
+}
+beforeEach(() => { localStorage.clear(); serveReferences(); });
+afterEach(() => { localStorage.clear(); });
+
+it('shows defaults, approved audio, edits engine/export controls and sends captured options', async () => {
+  const state = generation(); render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  const user = await select();
+  expect(screen.getByLabelText('Seed — вариация')).toHaveValue(42);
+  expect(screen.getByLabelText('Шаги синтеза')).toHaveValue(10);
+  expect(screen.getByLabelText('CFG')).toHaveValue(2);
+  expect(screen.getByLabelText('Темп экспортируемого аудио, %')).toHaveValue(100);
+  expect(screen.getByLabelText('Аудио опорного клипа')).toHaveAttribute('src', `/api/projects/book1/voxcpm-generation/models/${model}/references/${clip}/audio`);
+  for (const [label, value] of [['Seed — вариация', '123'], ['Шаги синтеза', '12'], ['CFG', '2.5'], ['Темп экспортируемого аудио, %', '90']]) {
+    await user.clear(screen.getByLabelText(label)); await user.type(screen.getByLabelText(label), value);
+  }
+  await user.selectOptions(screen.getByLabelText('Опорный клип'), clip);
+  await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение/));
+  await user.click(screen.getByRole('button', { name: 'Проба голоса' }));
+  expect(state.enqueue).toHaveBeenCalledWith('preview', ['s1'], '"2"', { savedVoxCpmModelId: model, experimentalConfirmed: true,
+    voxCpmOptions: { seed: 123, timesteps: 12, cfg: 2.5, tempoPercent: 90, useReference: true, referenceClipId: clip } });
+  expect(screen.getByText(/приблизительно сохраняет высоту голоса/)).toHaveTextContent(/экспортируемый WAV/);
+});
+
+it('resets defaults, creates crypto seed, persists valid project drafts but never consent', async () => {
+  vi.spyOn(crypto, 'getRandomValues').mockImplementation(array => { (array as Uint32Array)[0] = 123456; return array; });
+  const state = generation(); const view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  const user = await select(); await user.click(screen.getByRole('button', { name: 'Новая вариация' }));
+  expect(screen.getByLabelText('Seed — вариация')).toHaveValue(123456);
+  await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение/));
+  view.unmount(); render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  expect(screen.getByLabelText('Seed — вариация')).toHaveValue(123456);
+  expect(screen.getByLabelText(/Подтверждаю экспериментальное применение/)).not.toBeChecked();
+  await user.click(screen.getByRole('button', { name: 'Сбросить настройки' }));
+  expect(screen.getByLabelText('Seed — вариация')).toHaveValue(42);
+  await user.clear(screen.getByLabelText('Шаги синтеза')); await user.type(screen.getByLabelText('Шаги синтеза'), '21');
+  await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение/));
+  expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeDisabled();
+});
+
+it('ignores invalid stored settings and keeps drafts isolated across projects', async () => {
+  localStorage.setItem('voxcpm-generation-draft:book1', JSON.stringify({ modelId: `voxcpm:${model}`, options: { ...defaults, cfg: 999 } }));
+  const state = generation(); const view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue('');
+  const user = await select(); await user.clear(screen.getByLabelText('Seed — вариация')); await user.type(screen.getByLabelText('Seed — вариация'), '77');
+  view.rerender(<GenerationPanel current={{ ...current, snapshot: { ...current.snapshot, id: 'book2' } }} generation={state} busy={false} voxTraining={{ ...vox, projectId: 'book2' }} />);
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue('');
+  await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), `voxcpm:${model}`);
+  expect(screen.getByLabelText('Seed — вариация')).toHaveValue(42);
+});
+
+it('rejects a malformed stored model and admits only the six documented draft controls', async () => {
+  localStorage.setItem('voxcpm-generation-draft:book1', JSON.stringify({ modelId: 'voxcpm:malformed', options: defaults }));
+  const state = generation(); let view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue(''); view.unmount();
+  localStorage.setItem('voxcpm-generation-draft:book1', JSON.stringify({ modelId: `voxcpm:${model}`, options: { ...defaults, unrecognizedControl: 9 } }));
+  view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  await screen.findByRole('option', { name: /Подтверждённый текст/ });
+  const user = userEvent.setup(); await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение/)); await user.click(screen.getByRole('button', { name: 'Проба голоса' }));
+  expect(state.enqueue).toHaveBeenCalledWith('preview', ['s1'], '"2"', { savedVoxCpmModelId: model, experimentalConfirmed: true, voxCpmOptions: defaults });
+});
+
+it('retains a saved selection while model history loads and honors switching back to the short sample on reload', async () => {
+  localStorage.setItem('voxcpm-generation-draft:book1', JSON.stringify({ modelId: `voxcpm:${model}`, options: { ...defaults, seed: 88 } }));
+  const state = generation(); let view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={null} />);
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue(`voxcpm:${model}`);
+  view.rerender(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  await screen.findByRole('option', { name: /Подтверждённый текст/ }); expect(screen.getByLabelText('Seed — вариация')).toHaveValue(88);
+  await userEvent.setup().selectOptions(screen.getByLabelText('Голос для озвучивания'), ''); view.unmount();
+  view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue('');
+});
+
+it('isolates stale reference responses, clears explicit clip on model change and permits reference off', async () => {
+  let resolve!: (value: Response) => void; let signal: AbortSignal | undefined;
+  vi.stubGlobal('fetch', async (path: string, init?: RequestInit) => path.includes(otherModel)
+    ? new Response(JSON.stringify(catalog(otherModel, otherClip)))
+    : new Promise<Response>(done => { resolve = done; signal = init?.signal as AbortSignal; }));
+  const state = generation(); render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  const user = userEvent.setup(); await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), `voxcpm:${model}`);
+  await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), `voxcpm:${otherModel}`);
+  await screen.findByRole('option', { name: /Подтверждённый текст/ }); expect(signal?.aborted).toBe(true);
+  await act(async () => { resolve(new Response(JSON.stringify(catalog()))); });
+  expect(screen.queryByRole('option', { name: clip })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Опорный клип')).toHaveValue('');
+  await user.selectOptions(screen.getByLabelText('Опорный клип'), otherClip);
+  await user.click(screen.getByLabelText('Использовать опорный клип'));
+  await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение/)); await user.click(screen.getByRole('button', { name: 'Проба голоса' }));
+  expect(state.enqueue).toHaveBeenLastCalledWith('preview', ['s1'], '"2"', { savedVoxCpmModelId: otherModel, experimentalConfirmed: true, voxCpmOptions: { ...defaults, useReference: false } });
+});
+
+it('blocks missing approved reference without a fallback and freezes settings while retaining cancel', async () => {
+  vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ ...catalog(), clips: [], defaultClipId: null })));
+  const state = generation(); const view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  const user = userEvent.setup(); await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), `voxcpm:${model}`);
+  await screen.findByText(/Подходящий подтверждённый клип недоступен/);
+  await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение/));
+  expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeDisabled();
+  expect(state.enqueue).not.toHaveBeenCalled();
+  await user.click(screen.getByLabelText('Использовать опорный клип'));
+  expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeEnabled();
+  const job: JobSnapshot = { id: 'active1', projectId: 'book1', kind: 'preview', state: 'running', requestedState: 'run', phase: 'synthesizing', completedUnits: 0, totalUnits: 1, revision: 1,
+    createdUtc: '', updatedUtc: '', completedUtc: null, diagnosticCode: null, inputHash: 'hash', effectiveProfileId: 'voxcpm2-saved-adapter-controls-cpu-v1' };
+  view.rerender(<GenerationPanel current={current} generation={{ ...state, jobs: [job] }} busy={false} voxTraining={vox} />);
+  expect(screen.getByLabelText('Seed — вариация')).toBeDisabled(); expect(screen.getByLabelText('Голос для озвучивания')).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Отменить задание' })); expect(state.control).toHaveBeenCalledWith(job, 'cancel');
+});
+
+it('aborts references on project switch and never installs their late reply into the new project', async () => {
+  let resolve!: (value: Response) => void; let signal: AbortSignal | undefined;
+  vi.stubGlobal('fetch', async (_path: string, init?: RequestInit) => new Promise<Response>(done => { resolve = done; signal = init?.signal as AbortSignal; }));
+  const state = generation(); const view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  await userEvent.setup().selectOptions(screen.getByLabelText('Голос для озвучивания'), `voxcpm:${model}`);
+  view.rerender(<GenerationPanel current={{ ...current, snapshot: { ...current.snapshot, id: 'book2' } }} generation={state} busy={false} voxTraining={{ ...vox, projectId: 'book2' }} />);
+  expect(signal?.aborted).toBe(true); await act(async () => { resolve(new Response(JSON.stringify(catalog()))); });
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue('');
+  expect(screen.queryByLabelText('Аудио опорного клипа')).not.toBeInTheDocument();
+});
+
+it('uses actual inference readiness independently and preserves ready GGUF refresh when it fails', async () => {
+  let failed = false;
+  vi.stubGlobal('fetch', async (path: string) => {
+    if (path === '/api/voxcpm-inference/readiness') { if (failed) throw new Error('offline'); return new Response(JSON.stringify(runtime)); }
+    return new Response(JSON.stringify(path.endsWith('/jobs') ? [] : path === '/api/runtime/readiness' ? { ...runtime, profileId: 'q8-f16-cpu' } : { ...current.snapshot, revision: failed ? 3 : 2 }), { headers: { ETag: '"2"' } });
+  });
+  const install = vi.fn(); const { result } = renderHook(() => useProjectEvents(newClient, 'book1', install));
+  await waitFor(() => expect(result.current.voxReadiness?.ready).toBe(true));
+  failed = true; await act(async () => { TestEventSource.instances.at(-1)!.emit('job'); });
+  await waitFor(() => expect(install).toHaveBeenLastCalledWith(expect.objectContaining({ snapshot: expect.objectContaining({ revision: 3 }) })));
+  expect(result.current.readiness?.ready).toBe(true); expect(result.current.voxReadiness?.ready).toBe(false);
+});
+const newClient = new StudioClient();
+
+it('retains captured history/audio after refresh and reuses captured options/model without consent', async () => {
+  const captured = { ...defaults, seed: 99, tempoPercent: 85, referenceClipId: clip };
+  const state = generation(); state.jobs = [{ id: 'job1', projectId: 'book1', kind: 'preview', state: 'completed', requestedState: 'run', phase: 'completed', completedUnits: 33, totalUnits: 33, revision: 2,
+    createdUtc: '', updatedUtc: '', completedUtc: '', diagnosticCode: null, inputHash: 'hash', effectiveProfileId: 'voxcpm2-saved-adapter-controls-cpu-v1',
+    voxCpmGeneration: { modelId: model, globalStep: 29, options: captured, referenceClipId: clip, referenceTrainingOrdinal: 0, referenceSeconds: 12 },
+    audioResults: [{ segmentId: 's1', order: 0, artifactId: 'audio1', seconds: 4.2, spokenText: 'Исторический текст.' }] }];
+  const view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  const history = screen.getByRole('article', { name: 'Пробное задание' });
+  expect(within(history).getByText(/Seed: 99/)).toHaveTextContent(/85%/);
+  expect(within(history).getByLabelText('Аудио результата 1')).toHaveAttribute('src', '/api/projects/book1/artifacts/audio1');
+  expect(within(history).getByRole('link', { name: /Скачать WAV/ })).toHaveAttribute('href', '/api/projects/book1/artifacts/audio1');
+  expect(screen.getByText(/последние 32 завершённых задания/)).toBeInTheDocument();
+  expect(within(history).getByText(/первые 32/)).toBeInTheDocument();
+  const user = userEvent.setup(); await user.click(within(history).getByRole('button', { name: 'Использовать эти настройки' }));
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue(`voxcpm:${model}`);
+  expect(screen.getByLabelText('Seed — вариация')).toHaveValue(99);
+  expect(screen.getByLabelText(/Подтверждаю экспериментальное применение/)).not.toBeChecked();
+  view.rerender(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  expect(within(history).getByText(/Seed: 99/)).toBeInTheDocument();
+});
+
+it('keeps all six options in uncertain retry identity and wire, changing any option gets a new key', async () => {
+  const calls: RequestInit[] = [];
+  vi.stubGlobal('fetch', async (path: string, init?: RequestInit) => {
+    if (init?.method === 'POST') { calls.push(init); throw new Error('lost'); }
+    return new Response(JSON.stringify(path.endsWith('/bootstrap') ? { version: '1', antiforgeryRequestToken: 'csrf', capabilities: {} }
+      : path.endsWith('/readiness') ? { ...runtime, profileId: path.includes('voxcpm') ? runtime.profileId : 'q8-f16-cpu' }
+        : path.endsWith('/jobs') ? [] : current.snapshot), { headers: { ETag: '"2"' } });
+  });
+  const client = new StudioClient(); await client.bootstrap(); const install = vi.fn();
+  const { result } = renderHook(() => useProjectEvents(client, 'book1', install)); await waitFor(() => expect(result.current.voxReadiness).toBeDefined());
+  const send = async (options: typeof defaults) => { await act(async () => { await result.current.enqueue('preview', ['s1'], '"2"', { savedVoxCpmModelId: model, experimentalConfirmed: true, voxCpmOptions: options }); }); };
+  await send(defaults); await send({ ...defaults });
+  const first = new Headers(calls[0].headers).get('Idempotency-Key'); expect(new Headers(calls[1].headers).get('Idempotency-Key')).toBe(first);
+  for (const options of [{ ...defaults, seed: 43 }, { ...defaults, timesteps: 11 }, { ...defaults, cfg: 2.1 }, { ...defaults, tempoPercent: 99 }, { ...defaults, useReference: false }, { ...defaults, referenceClipId: clip }]) await send(options as typeof defaults);
+  expect(new Set(calls.slice(1).map(call => new Headers(call.headers).get('Idempotency-Key'))).size).toBe(7);
+  expect(JSON.parse(calls[0].body as string).voxCpmOptions).toEqual(defaults);
+});

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://localaudiobookstudio.invalid/schemas/ru-v1.schema.json",
+  "title": "Russian VoxCPM2 acceptance corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "language", "max_target_seconds", "items"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "language": { "const": "ru-RU" },
+    "max_target_seconds": { "const": 20 },
+    "items": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "text", "spoken_normalized", "max_steps"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^ru-v1-[0-9]{2}$"
+          },
+          "category": {
+            "enum": [
+              "neutral-short",
+              "neutral-long",
+              "direct-speech",
+              "question",
+              "exclamation",
+              "date-time",
+              "cardinal-numbers",
+              "ordinal-numbers",
+              "abbreviations-units",
+              "names-geography",
+              "yo-letter",
+              "list",
+              "embedded-quotes"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 350
+          },
+          "spoken_normalized": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "max_steps": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 125
+          }
+        }
+      }
+    }
+  }
+}
+

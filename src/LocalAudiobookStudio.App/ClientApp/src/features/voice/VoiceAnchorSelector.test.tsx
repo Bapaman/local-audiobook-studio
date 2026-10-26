@@ -1,0 +1,30 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { expect, it, vi } from 'vitest';
+import { VoiceAnchorSelector } from './VoiceAnchorSelector';
+
+it('validates 10–20 seconds, seeks native audio, and resets explicit confirmation on range changes', async () => {
+  const confirm = vi.fn(); const user = userEvent.setup();
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  render(<VoiceAnchorSelector durationMilliseconds={30000} mediaUrl="/api/projects/book1/artifacts/record1" busy={false} onConfirm={confirm} />);
+  const audio = screen.getByLabelText('Прослушивание записи') as HTMLAudioElement;
+  expect(audio).toHaveAttribute('src', '/api/projects/book1/artifacts/record1');
+  await user.type(screen.getByLabelText('Точный текст фрагмента'), 'Ёжик.');
+  await user.click(screen.getByLabelText('Прослушал и подтверждаю'));
+  const end = screen.getByLabelText('Конец, секунды');
+  await user.clear(end); await user.type(end, '9');
+  expect(screen.getByRole('button', { name: 'Подтвердить голосовой фрагмент' })).toBeDisabled();
+  expect(screen.getByRole('status')).toHaveTextContent(/10–20/);
+  await user.clear(end); await user.type(end, '21');
+  expect(screen.getByRole('button', { name: 'Подтвердить голосовой фрагмент' })).toBeDisabled();
+  await user.clear(screen.getByLabelText('Начало, секунды')); await user.type(screen.getByLabelText('Начало, секунды'), '5');
+  await user.clear(end); await user.type(end, '15');
+  expect(screen.getByLabelText('Прослушал и подтверждаю')).not.toBeChecked();
+  await user.click(screen.getByRole('button', { name: 'Прослушать выбранный фрагмент' }));
+  expect(audio.currentTime).toBe(5);
+  expect(screen.getByRole('button', { name: 'Подтвердить голосовой фрагмент' })).toBeDisabled();
+  await user.click(screen.getByLabelText('Прослушал и подтверждаю'));
+  await user.click(screen.getByRole('button', { name: 'Подтвердить голосовой фрагмент' }));
+  expect(confirm).toHaveBeenCalledWith({ startMilliseconds: 5000, endMilliseconds: 15000, transcript: 'Ёжик.', pairListenedAndConfirmed: true });
+});

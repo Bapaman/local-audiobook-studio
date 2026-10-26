@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <!-- Include nested authored sources, excluding the SDK's generated bin/obj trees. -->
+  <PropertyGroup>
+    <_HarnessSourceCount>$([System.IO.Directory]::GetFiles('$(MSBuildProjectDirectory)', '*.cs', System.IO.SearchOption.AllDirectories).Length)</_HarnessSourceCount>
+    <_HarnessBinSourceCount>0</_HarnessBinSourceCount>
+    <_HarnessObjSourceCount>0</_HarnessObjSourceCount>
+    <_HarnessBinSourceCount Condition="Exists('$(MSBuildProjectDirectory)/bin')">$([System.IO.Directory]::GetFiles('$(MSBuildProjectDirectory)/bin', '*.cs', System.IO.SearchOption.AllDirectories).Length)</_HarnessBinSourceCount>
+    <_HarnessObjSourceCount Condition="Exists('$(MSBuildProjectDirectory)/obj')">$([System.IO.Directory]::GetFiles('$(MSBuildProjectDirectory)/obj', '*.cs', System.IO.SearchOption.AllDirectories).Length)</_HarnessObjSourceCount>
+    <_HarnessAuthoredSourceCount>$([MSBuild]::Subtract($(_HarnessSourceCount), $([MSBuild]::Add($(_HarnessBinSourceCount), $(_HarnessObjSourceCount)))))</_HarnessAuthoredSourceCount>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(_HarnessAuthoredSourceCount)' == '0'">
+    <IsTestProject>false</IsTestProject>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <Using Include="Xunit" />
+    <ProjectReference Include="..\..\src\LocalAudiobookStudio.WorkerHost\LocalAudiobookStudio.WorkerHost.csproj" />
+    <ProjectReference Include="..\fixtures\FakeVoxCpm\FakeVoxCpm.csproj" ReferenceOutputAssembly="false" AdditionalProperties="Platform=AnyCPU" />
+  </ItemGroup>
+  <Target Name="CopySyntheticNativeFixture" AfterTargets="Build">
+    <MSBuild Projects="..\fixtures\FakeVoxCpm\FakeVoxCpm.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration);Platform=AnyCPU">
+      <Output TaskParameter="TargetOutputs" ItemName="_FakeVoxCpmTarget" />
+    </MSBuild>
+    <ItemGroup><_FakeVoxCpmFiles Include="@(_FakeVoxCpmTarget);@(_FakeVoxCpmTarget->'%(RootDir)%(Directory)llama.exe');@(_FakeVoxCpmTarget->'%(RootDir)%(Directory)llama.runtimeconfig.json');@(_FakeVoxCpmTarget->'%(RootDir)%(Directory)llama.deps.json')" /></ItemGroup>
+    <Copy SourceFiles="@(_FakeVoxCpmFiles)" DestinationFolder="$(OutDir)fake-native" />
+  </Target>
+</Project>

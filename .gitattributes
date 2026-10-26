@@ -1,0 +1,6 @@
+/src/TtsCorpusWorker/*.py text eol=lf
+/eng/locks/whisper-large-v3-turbo.lock.json text eol=lf
+/src/VoxCpmTrainingWorker/*.py text eol=lf
+/eng/locks/voxcpm2-training.lock.json text eol=lf
+/src/VoxCpmInferenceWorker/*.py text eol=lf
+/eng/locks/voxcpm2-inference.lock.json text eol=lf

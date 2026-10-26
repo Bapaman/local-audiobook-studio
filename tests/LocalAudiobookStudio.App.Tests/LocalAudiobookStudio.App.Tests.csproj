@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <WindowsSdkPackageVersion>10.0.26100.57</WindowsSdkPackageVersion>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <!-- Include nested authored sources, excluding the SDK's generated bin/obj trees. -->
+  <PropertyGroup>
+    <_HarnessSourceCount>$([System.IO.Directory]::GetFiles('$(MSBuildProjectDirectory)', '*.cs', System.IO.SearchOption.AllDirectories).Length)</_HarnessSourceCount>
+    <_HarnessBinSourceCount>0</_HarnessBinSourceCount>
+    <_HarnessObjSourceCount>0</_HarnessObjSourceCount>
+    <_HarnessBinSourceCount Condition="Exists('$(MSBuildProjectDirectory)/bin')">$([System.IO.Directory]::GetFiles('$(MSBuildProjectDirectory)/bin', '*.cs', System.IO.SearchOption.AllDirectories).Length)</_HarnessBinSourceCount>
+    <_HarnessObjSourceCount Condition="Exists('$(MSBuildProjectDirectory)/obj')">$([System.IO.Directory]::GetFiles('$(MSBuildProjectDirectory)/obj', '*.cs', System.IO.SearchOption.AllDirectories).Length)</_HarnessObjSourceCount>
+    <_HarnessAuthoredSourceCount>$([MSBuild]::Subtract($(_HarnessSourceCount), $([MSBuild]::Add($(_HarnessBinSourceCount), $(_HarnessObjSourceCount)))))</_HarnessAuthoredSourceCount>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(_HarnessAuthoredSourceCount)' == '0'">
+    <IsTestProject>false</IsTestProject>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <Using Include="Xunit" />
+    <ProjectReference Include="..\..\src\LocalAudiobookStudio.Application\LocalAudiobookStudio.Application.csproj" />
+    <ProjectReference Include="..\..\src\LocalAudiobookStudio.App\LocalAudiobookStudio.App.csproj" />
+    <ProjectReference Include="..\..\src\LocalAudiobookStudio.Core\LocalAudiobookStudio.Core.csproj" />
+    <ProjectReference Include="..\..\src\LocalAudiobookStudio.Contracts\LocalAudiobookStudio.Contracts.csproj" />
+    <ProjectReference Include="..\fixtures\FakeVoxCpm\FakeVoxCpm.csproj" ReferenceOutputAssembly="false" AdditionalProperties="Platform=AnyCPU" />
+  </ItemGroup>
+  <Target Name="CopySyntheticWorkerNativeFixture" AfterTargets="Build">
+    <MSBuild Projects="..\fixtures\FakeVoxCpm\FakeVoxCpm.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration);Platform=AnyCPU">
+      <Output TaskParameter="TargetOutputs" ItemName="_SyntheticWorkerNativeTarget" />
+    </MSBuild>
+    <ItemGroup>
+      <_SyntheticWorkerNativeFiles Include="@(_SyntheticWorkerNativeTarget);@(_SyntheticWorkerNativeTarget->'%(RootDir)%(Directory)llama.exe');@(_SyntheticWorkerNativeTarget->'%(RootDir)%(Directory)llama.runtimeconfig.json');@(_SyntheticWorkerNativeTarget->'%(RootDir)%(Directory)llama.deps.json')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_SyntheticWorkerNativeFiles)" DestinationFolder="$(OutDir)fake-native" />
+  </Target>
+</Project>

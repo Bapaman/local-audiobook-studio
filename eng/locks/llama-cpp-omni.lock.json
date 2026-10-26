@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "artifact": "llama.cpp-omni",
+  "kind": "git",
+  "repository": "https://github.com/tc-mb/llama.cpp-omni.git",
+  "tag": "b267",
+  "commit": "873056743b74e1a4ce5dcf7290e2298428e214db",
+  "license": "MIT",
+  "licenseFile": "LICENSE"
+}

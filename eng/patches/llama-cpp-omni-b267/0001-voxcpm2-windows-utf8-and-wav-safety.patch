@@ -1,0 +1,194 @@
+diff --git a/tools/omni/voxcpm2/voxcpm2_cli.cpp b/tools/omni/voxcpm2/voxcpm2_cli.cpp
+--- a/tools/omni/voxcpm2/voxcpm2_cli.cpp
++++ b/tools/omni/voxcpm2/voxcpm2_cli.cpp
+@@ -25,10 +25,16 @@
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
++#include <filesystem>
+ #include <fstream>
+ #include <string>
+ #include <vector>
+ 
++#if defined(_WIN32)
++#define WIN32_LEAN_AND_MEAN
++#define NOMINMAX
++#include <windows.h>
++#include <shellapi.h>
++#endif
++
+ namespace {
+ 
+ struct CliConfig {
+@@ -49,6 +55,54 @@ struct CliConfig {
+     int    seed          = 42;
+ };
+ 
++static std::vector<std::string> ingest_args(int raw_argc, char ** raw_argv) {
++    std::vector<std::string> arguments;
++#if defined(_WIN32)
++    int wide_argc = 0;
++    LPWSTR * wide_argv = CommandLineToArgvW(GetCommandLineW(), &wide_argc);
++    if (wide_argv == nullptr) {
++        std::fprintf(stderr, "Could not read the UTF-16 Windows command line (error=%lu)\n", GetLastError());
++        return {};
++    }
++
++    arguments.reserve(static_cast<size_t>(wide_argc));
++    for (int index = 0; index < wide_argc; ++index) {
++        const int required = WideCharToMultiByte(
++            CP_UTF8, WC_ERR_INVALID_CHARS, wide_argv[index], -1, nullptr, 0, nullptr, nullptr);
++        if (required <= 0) {
++            std::fprintf(stderr, "Could not convert Windows argument %d to UTF-8 (error=%lu)\n",
++                         index, GetLastError());
++            LocalFree(wide_argv);
++            return {};
++        }
++        std::string utf8(static_cast<size_t>(required), '\0');
++        const int written = WideCharToMultiByte(
++            CP_UTF8, WC_ERR_INVALID_CHARS, wide_argv[index], -1,
++            utf8.data(), required, nullptr, nullptr);
++        if (written != required) {
++            std::fprintf(stderr, "Could not convert Windows argument %d to UTF-8 (error=%lu)\n",
++                         index, GetLastError());
++            LocalFree(wide_argv);
++            return {};
++        }
++        utf8.resize(static_cast<size_t>(required - 1));
++        arguments.push_back(std::move(utf8));
++    }
++    LocalFree(wide_argv);
++    (void) raw_argc;
++    (void) raw_argv;
++#else
++    arguments.reserve(static_cast<size_t>(raw_argc));
++    for (int index = 0; index < raw_argc; ++index) {
++        arguments.emplace_back(raw_argv[index]);
++    }
++#endif
++    return arguments;
++}
++
++static std::filesystem::path utf8_path(const std::string & path) {
++    return std::filesystem::u8path(path);
++}
++
+ static void print_usage(const char * prog) {
+     std::fprintf(stderr,
+         "VoxCPM2 CLI — Text-to-Speech Synthesis\n"
+@@ -137,10 +191,10 @@ static bool parse_args(int argc, char ** argv, CliConfig & cfg) {
+     return true;
+ }
+ 
+-static void write_wav(const std::string & path, const std::vector<float> & pcm, int sample_rate) {
+-    std::ofstream f(path, std::ios::binary);
++static bool write_wav(const std::string & path, const std::vector<float> & pcm, int sample_rate) {
++    std::ofstream f(utf8_path(path), std::ios::binary);
+     if (!f) {
+         LOG_ERR("Cannot create: %s\n", path.c_str());
+-        return;
++        return false;
+     }
+     const int32_t n_samples = static_cast<int32_t>(pcm.size());
+     const int32_t byte_rate = sample_rate * 2;  // 16-bit mono
+@@ -158,10 +212,16 @@ static void write_wav(const std::string & path, const std::vector<float> & pcm,
+         v = std::max(-1.0f, std::min(1.0f, v));
+         w16(static_cast<int16_t>(v * 32767.0f));
+     }
++    f.flush();
++    if (!f.good()) {
++        LOG_ERR("Could not finish writing: %s\n", path.c_str());
++        return false;
++    }
++    return true;
+ }
+ 
+ static std::vector<float> load_wav_mono(const std::string & path, int & out_sample_rate) {
+-    std::ifstream f(path, std::ios::binary);
++    std::ifstream f(utf8_path(path), std::ios::binary);
+     if (!f) {
+         LOG_ERR("Cannot open: %s\n", path.c_str());
+         return {};
+@@ -177,6 +237,10 @@ static std::vector<float> load_wav_mono(const std::string & path, int & out_sam
+     while (f) {
+         char id[4]; int32_t size;
+         f.read(id, 4); f.read(reinterpret_cast<char *>(&size), 4);
+         if (!f) break;
++        if (size < 0) {
++            LOG_ERR("Invalid WAV chunk size: %s\n", path.c_str());
++            return {};
++        }
+         if (std::strncmp(id, "fmt ", 4) == 0) {
++            if (size < 16) {
++                LOG_ERR("Invalid WAV fmt chunk: %s\n", path.c_str());
++                return {};
++            }
+             f.read(reinterpret_cast<char *>(&audio_format), 2);
+             f.read(reinterpret_cast<char *>(&num_channels), 2);
+             f.read(reinterpret_cast<char *>(&sample_rate), 4);
+@@ -186,22 +250,34 @@ static std::vector<float> load_wav_mono(const std::string & path, int & out_sam
+             f.read(reinterpret_cast<char *>(&block_align), 2);
+             f.read(reinterpret_cast<char *>(&bits_per_sample), 2);
+             if (size > 16) f.seekg(size - 16, std::ios::cur);
++            if ((size & 1) != 0) f.seekg(1, std::ios::cur);
+         } else if (std::strncmp(id, "data", 4) == 0) {
+             data_size = size;
+             break;
+         } else {
+             f.seekg(size, std::ios::cur);
++            if ((size & 1) != 0) f.seekg(1, std::ios::cur);
+         }
+     }
+-    if (audio_format != 1 || data_size <= 0) {
+-        LOG_ERR("Unsupported WAV format: %s (fmt=%d, data=%d)\n", path.c_str(), audio_format, data_size);
++    const int32_t expected_block_align = static_cast<int32_t>(num_channels) * 2;
++    if (audio_format != 1 || bits_per_sample != 16 || num_channels <= 0 || sample_rate <= 0 ||
++        data_size <= 0 || expected_block_align <= 0 || data_size % expected_block_align != 0) {
++        LOG_ERR("Unsupported WAV format: %s (fmt=%d, channels=%d, rate=%d, bits=%d, data=%d)\n",
++                path.c_str(), audio_format, num_channels, sample_rate, bits_per_sample, data_size);
+         return {};
+     }
+     out_sample_rate = sample_rate;
+-    int n_samples = data_size / (bits_per_sample / 8);
++    const int n_samples = data_size / 2;
+     std::vector<int16_t> raw(n_samples);
+     f.read(reinterpret_cast<char *>(raw.data()), data_size);
++    if (!f || f.gcount() != static_cast<std::streamsize>(data_size)) {
++        LOG_ERR("Truncated WAV data: %s\n", path.c_str());
++        return {};
++    }
+ 
+     std::vector<float> pcm(static_cast<size_t>(n_samples) / num_channels);
+@@ -350,7 +426,10 @@ static int run_synthesis(const CliConfig & cfg) {
+ 
+     int sample_rate = runtime.sample_rate();
+     report_stats(wav, sample_rate, elapsed);
+-    write_wav(cfg.output_path, wav, sample_rate);
++    if (!write_wav(cfg.output_path, wav, sample_rate)) {
++        LOG_ERR("Failed to save WAV: %s\n", cfg.output_path.c_str());
++        return 1;
++    }
+     LOG_INF("WAV saved: %s\n", cfg.output_path.c_str());
+ 
+     return 0;
+@@ -359,9 +438,19 @@ static int run_synthesis(const CliConfig & cfg) {
+ }  // namespace
+ 
+ int main(int argc, char ** argv) {
++    std::vector<std::string> utf8_arguments = ingest_args(argc, argv);
++    if (utf8_arguments.empty()) {
++        return 1;
++    }
++    std::vector<char *> utf8_argv;
++    utf8_argv.reserve(utf8_arguments.size());
++    for (std::string & argument : utf8_arguments) {
++        utf8_argv.push_back(argument.data());
++    }
++
+     ggml_time_init();
+ 
+     CliConfig cfg;
+-    if (!parse_args(argc, argv, cfg)) return 1;
++    if (!parse_args(static_cast<int>(utf8_argv.size()), utf8_argv.data(), cfg)) return 1;
+ 
+     const int rc = run_synthesis(cfg);

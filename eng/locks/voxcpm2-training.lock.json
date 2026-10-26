@@ -1,0 +1,3383 @@
+{
+  "format": 1,
+  "license": {
+    "filename": "LICENSE",
+    "bytes": 11498,
+    "sha256": "cecbfbf54d0089e8d70b479fd2401964b8cfc7d0b1170418f0142da56f3aeae8"
+  },
+  "sourceCommit": "cce58a5b59303c9bd63d12f23afe6a49a4a80c59",
+  "baseRevision": "32279effe8c19989596f05d353d1447f51d9e915",
+  "sourceFiles": {
+    "src/voxcpm/__init__.py": {
+      "bytes": 106,
+      "sha256": "9355bbbcfcf85c76e3285fcfd79a9023e239064e49c0a5295d536cf5c9f0931c"
+    },
+    "src/voxcpm/cli.py": {
+      "bytes": 23814,
+      "sha256": "5355c3968729be28d009d2220d55d87fa1c60223706151c7b767dad041363e7e"
+    },
+    "src/voxcpm/core.py": {
+      "bytes": 17190,
+      "sha256": "208c5d8f12a1de3315e4382d9a731afe6c09108c064f85a0eac90e76682eda8b"
+    },
+    "src/voxcpm/model/__init__.py": {
+      "bytes": 113,
+      "sha256": "2dffc4bbdb125c21d93aa5b12c11f82a16b14a891ee7ef1a89e5f55b435d897b"
+    },
+    "src/voxcpm/model/utils.py": {
+      "bytes": 8497,
+      "sha256": "a1782a30de254f5cba2f36e25c5a16577d5ad3c72b570c0221dcc40071331058"
+    },
+    "src/voxcpm/model/voxcpm.py": {
+      "bytes": 44204,
+      "sha256": "9a08d73a780ab2f4f588e6b8ab24aeecc5541fc7f24a6bbd7a49ff8d10dae1b6"
+    },
+    "src/voxcpm/model/voxcpm2.py": {
+      "bytes": 55994,
+      "sha256": "c9b0dba61ec4bd186599b53cbe044e054bf3f40778551ed046219d80f16ff532"
+    },
+    "src/voxcpm/modules/__init__.py": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "src/voxcpm/modules/audiovae/__init__.py": {
+      "bytes": 135,
+      "sha256": "59d03a2afcd6117320c3a9100702e65401a789e7a72c6b2709e6ed85fdcc7415"
+    },
+    "src/voxcpm/modules/audiovae/audio_vae.py": {
+      "bytes": 11248,
+      "sha256": "266956cce6e77dccafc4a597298c29366801fcd4cfaa409f6bfbe872599684ac"
+    },
+    "src/voxcpm/modules/audiovae/audio_vae_v2.py": {
+      "bytes": 19780,
+      "sha256": "263837262b9eed17fd54101e21e16d567412eca22744c4c26a59943191881ffe"
+    },
+    "src/voxcpm/modules/layers/__init__.py": {
+      "bytes": 64,
+      "sha256": "addde54551542f9e5c6da30e0414813fed61d73d89dfe1d3db7b1be7aeaae8d6"
+    },
+    "src/voxcpm/modules/layers/lora.py": {
+      "bytes": 4500,
+      "sha256": "3e8e7f587103a2c0cc85b33d5d130829dce562090629d965a9fe97b28982c474"
+    },
+    "src/voxcpm/modules/layers/scalar_quantization_layer.py": {
+      "bytes": 826,
+      "sha256": "df5991d840fa64694d753fae16c50f92952d929e4596407d14c8da281ff7c823"
+    },
+    "src/voxcpm/modules/locdit/__init__.py": {
+      "bytes": 143,
+      "sha256": "39c21d433f6bfccd3a8c47f054789caddc42943804357de6fa0ecb84b0747669"
+    },
+    "src/voxcpm/modules/locdit/local_dit.py": {
+      "bytes": 3633,
+      "sha256": "7877691b7154af8f9bc8d908821c9f35931e30d840387351aace63b2fe9b14c7"
+    },
+    "src/voxcpm/modules/locdit/local_dit_v2.py": {
+      "bytes": 3696,
+      "sha256": "25dbf0e68226abbbf1bdb98310402a12b35cbba9f5aca7f29a8dda557c5b0208"
+    },
+    "src/voxcpm/modules/locdit/unified_cfm.py": {
+      "bytes": 8946,
+      "sha256": "27edb75c27ea51a5f0bfe02a7cad83d5cfbca9df88d36bdddb178f7f3f4b3f77"
+    },
+    "src/voxcpm/modules/locenc/__init__.py": {
+      "bytes": 41,
+      "sha256": "a7c1631b4dfc9a99864e76180979270d03cbaae86c790f2dc6c5a5cf2c055220"
+    },
+    "src/voxcpm/modules/locenc/local_encoder.py": {
+      "bytes": 1039,
+      "sha256": "674813dbca9e8aceb7396d52552b6acc5535f1119d3ab586179ee280b0c1af56"
+    },
+    "src/voxcpm/modules/minicpm4/__init__.py": {
+      "bytes": 103,
+      "sha256": "62e48de4774bbc892fc6ada2684d61763f508a3f71a29396e0630eb516cfd7ec"
+    },
+    "src/voxcpm/modules/minicpm4/cache.py": {
+      "bytes": 1431,
+      "sha256": "c23a85f8f80ccc4200284ef8d3699b3b12d533f241b367d631f96ccb760c4afc"
+    },
+    "src/voxcpm/modules/minicpm4/config.py": {
+      "bytes": 732,
+      "sha256": "3b4e8ea3969bbff2ed3bb1188c0b4bb34fe956cb1ef1c1f1c0a013af0dc7c441"
+    },
+    "src/voxcpm/modules/minicpm4/model.py": {
+      "bytes": 17086,
+      "sha256": "a6ac85a25d628f575951e98309e4de35f8a5d4784d931f5cc22e40e82a7c5f82"
+    },
+    "src/voxcpm/timestamps/__init__.py": {
+      "bytes": 182,
+      "sha256": "e444a82d1830beac29e9514f8688b6c1883abcfe4b3199ec57712b4df25347c0"
+    },
+    "src/voxcpm/timestamps/base.py": {
+      "bytes": 691,
+      "sha256": "a9b760dcaaa686418c0e03369e443d5ff3142893586bc2648bc8077dad7d1aa7"
+    },
+    "src/voxcpm/timestamps/postprocess.py": {
+      "bytes": 808,
+      "sha256": "59ccbcfa3124d7b59e86a90d409d037b6630eaa04e7265ae8131f7330c8ba085"
+    },
+    "src/voxcpm/timestamps/stable_ts.py": {
+      "bytes": 3351,
+      "sha256": "d5438325404e29c6318cd6b58242398b2f243570cc9d9d5bd7e6799ec71642df"
+    },
+    "src/voxcpm/training/__init__.py": {
+      "bytes": 769,
+      "sha256": "81b50e3e6a52fb79009ab0805534bd1d56199507f0999798aa9f88b3a03cd8c9"
+    },
+    "src/voxcpm/training/accelerator.py": {
+      "bytes": 5719,
+      "sha256": "387bfdd247b143c28cf3432af8a99d73229ba12b7af89c5b21c63a0c52de0cdc"
+    },
+    "src/voxcpm/training/config.py": {
+      "bytes": 1131,
+      "sha256": "34f4f1d0a42f20be3999ad2600cb8f5d70ac56d355ee4186f49d8595fc54631e"
+    },
+    "src/voxcpm/training/data.py": {
+      "bytes": 13896,
+      "sha256": "edf30f0f5dc9318b9f963da45911f586498ea74ba1e9e358901ee3e5651f5edd"
+    },
+    "src/voxcpm/training/packers.py": {
+      "bytes": 17837,
+      "sha256": "94079e30e7b5ce85560052195eb88994044152736e0fceaec4f3a6bd48dc69bc"
+    },
+    "src/voxcpm/training/state.py": {
+      "bytes": 486,
+      "sha256": "f10d2ac780564208cb8f5b59e16ccfe7b673a8985d0036b017e2e757324a6740"
+    },
+    "src/voxcpm/training/tracker.py": {
+      "bytes": 2838,
+      "sha256": "12cff1035fc0ee915ef62b49a2a382112af97e086441b3285498e372bc9da45f"
+    },
+    "src/voxcpm/training/validate.py": {
+      "bytes": 10529,
+      "sha256": "7d9f8a6285aa577a24ec53d5c02c8318f50dd3642e1a6c19d9cce6b2f0b35541"
+    },
+    "src/voxcpm/utils/text_normalize.py": {
+      "bytes": 6456,
+      "sha256": "ce7223ee1fef9353fe393e1958cfd8a9fb92656e7abd22ac1af10a304ceddec1"
+    },
+    "src/voxcpm/zipenhancer.py": {
+      "bytes": 2794,
+      "sha256": "4a26349cb91df0de38aaf844a3b6cf83f364978178c309a82823cd24e8ab8c89"
+    }
+  },
+  "modelFiles": {
+    "audiovae.pth": {
+      "bytes": 376951122,
+      "sha256": "94b5d51e107e0507d4acc976cfdadb64edd6fd06d1f751dadbf2fd1594274bf1"
+    },
+    "config.json": {
+      "bytes": 4336,
+      "sha256": "405f0dcd92f7feba6011ed4eac5c8d4f74cba9712f07fd5cfa3063bbdd95402c"
+    },
+    "model.safetensors": {
+      "bytes": 4580080592,
+      "sha256": "f7f964cfa9da23653baec6e6f7750719977ad944ed9f95fe52fe3a620506891d"
+    },
+    "special_tokens_map.json": {
+      "bytes": 1632,
+      "sha256": "068594063e37662c02b21acf42ebb334ef6a74fb810e68a2368f88f08351de76"
+    },
+    "tokenization_voxcpm2.py": {
+      "bytes": 2895,
+      "sha256": "84489ea32b6ee0cae22ed5480cacb6df85c46624c3119be9a2021c3649a12729"
+    },
+    "tokenizer_config.json": {
+      "bytes": 5059,
+      "sha256": "e78a3ebb48a0b9437efd1823b6b726c823da89e49dd8bcc90c02419d9baa772b"
+    },
+    "tokenizer.json": {
+      "bytes": 3676772,
+      "sha256": "f8984687e4a92a3503d521396d454b7d68e9fdaab2a0288eb3536c7c1aa4bc20"
+    }
+  },
+  "adapterLayout": [
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.0.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.0.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.0.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.0.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.0.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.0.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.0.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.0.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.1.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.1.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.1.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.1.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.1.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.1.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.1.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.1.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.10.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.10.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.10.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.10.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.10.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.10.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.10.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.10.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.11.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.11.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.11.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.11.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.11.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.11.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.11.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.11.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.12.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.12.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.12.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.12.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.12.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.12.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.12.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.12.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.13.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.13.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.13.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.13.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.13.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.13.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.13.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.13.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.14.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.14.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.14.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.14.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.14.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.14.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.14.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.14.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.15.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.15.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.15.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.15.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.15.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.15.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.15.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.15.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.16.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.16.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.16.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.16.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.16.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.16.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.16.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.16.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.17.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.17.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.17.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.17.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.17.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.17.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.17.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.17.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.18.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.18.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.18.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.18.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.18.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.18.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.18.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.18.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.19.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.19.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.19.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.19.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.19.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.19.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.19.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.19.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.2.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.2.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.2.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.2.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.2.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.2.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.2.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.2.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.20.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.20.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.20.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.20.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.20.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.20.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.20.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.20.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.21.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.21.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.21.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.21.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.21.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.21.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.21.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.21.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.22.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.22.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.22.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.22.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.22.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.22.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.22.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.22.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.23.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.23.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.23.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.23.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.23.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.23.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.23.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.23.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.24.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.24.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.24.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.24.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.24.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.24.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.24.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.24.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.25.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.25.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.25.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.25.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.25.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.25.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.25.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.25.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.26.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.26.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.26.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.26.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.26.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.26.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.26.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.26.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.27.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.27.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.27.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.27.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.27.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.27.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.27.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.27.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.3.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.3.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.3.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.3.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.3.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.3.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.3.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.3.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.4.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.4.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.4.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.4.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.4.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.4.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.4.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.4.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.5.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.5.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.5.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.5.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.5.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.5.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.5.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.5.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.6.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.6.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.6.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.6.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.6.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.6.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.6.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.6.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.7.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.7.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.7.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.7.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.7.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.7.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.7.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.7.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.8.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.8.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.8.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.8.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.8.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.8.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.8.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.8.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.9.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.9.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.9.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.9.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.9.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.9.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.9.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "base_lm.layers.9.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.0.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.0.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.0.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.0.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.0.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.0.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.0.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.0.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.1.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.1.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.1.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.1.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.1.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.1.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.1.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.1.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.10.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.10.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.10.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.10.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.10.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.10.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.10.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.10.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.11.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.11.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.11.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.11.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.11.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.11.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.11.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.11.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.2.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.2.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.2.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.2.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.2.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.2.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.2.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.2.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.3.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.3.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.3.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.3.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.3.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.3.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.3.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.3.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.4.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.4.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.4.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.4.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.4.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.4.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.4.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.4.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.5.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.5.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.5.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.5.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.5.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.5.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.5.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.5.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.6.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.6.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.6.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.6.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.6.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.6.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.6.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.6.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.7.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.7.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.7.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.7.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.7.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.7.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.7.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.7.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.8.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.8.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.8.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.8.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.8.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.8.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.8.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.8.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.9.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.9.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.9.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.9.self_attn.o_proj.lora_B",
+      "shape": [
+        1024,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.9.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.9.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.9.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "feat_decoder.estimator.decoder.layers.9.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.0.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.0.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.0.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.0.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.0.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.0.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.0.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.0.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.1.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.1.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.1.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.1.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.1.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.1.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.1.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.1.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.2.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.2.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.2.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.2.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.2.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.2.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.2.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.2.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.3.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.3.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.3.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.3.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.3.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.3.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.3.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.3.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.4.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.4.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.4.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.4.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.4.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.4.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.4.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.4.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.5.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.5.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.5.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.5.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.5.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.5.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.5.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.5.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.6.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.6.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.6.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.6.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.6.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.6.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.6.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.6.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.7.self_attn.k_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.7.self_attn.k_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.7.self_attn.o_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.7.self_attn.o_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.7.self_attn.q_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.7.self_attn.q_proj.lora_B",
+      "shape": [
+        2048,
+        2
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.7.self_attn.v_proj.lora_A",
+      "shape": [
+        2,
+        2048
+      ]
+    },
+    {
+      "dtype": "F32",
+      "name": "residual_lm.layers.7.self_attn.v_proj.lora_B",
+      "shape": [
+        256,
+        2
+      ]
+    }
+  ],
+  "adapterLayoutSha256": "e6adf47f16d1088f4c958f341215ec1e4455816b605165bfb7a1bd2f3b3f143c",
+  "recipe": {
+    "batchSize": 1,
+    "clipsPerUpdate": 1,
+    "device": "cpu",
+    "dtype": "float32",
+    "format": 1,
+    "forward": {
+      "progress": 0.0,
+      "sampleGenerate": false
+    },
+    "gradientClip": {
+      "foreach": false,
+      "maxNorm": 1.0
+    },
+    "lora": {
+      "alpha": 2,
+      "dropout": 0.0,
+      "enable_dit": true,
+      "enable_lm": true,
+      "enable_proj": false,
+      "r": 2,
+      "target_modules_dit": [
+        "q_proj",
+        "v_proj",
+        "k_proj",
+        "o_proj"
+      ],
+      "target_modules_lm": [
+        "q_proj",
+        "v_proj",
+        "k_proj",
+        "o_proj"
+      ],
+      "target_proj_modules": [
+        "enc_to_lm_proj",
+        "lm_to_dit_proj",
+        "res_to_dit_proj",
+        "fusion_concat_proj"
+      ]
+    },
+    "optimizer": {
+      "amsgrad": false,
+      "betas": [
+        0.9,
+        0.999
+      ],
+      "capturable": false,
+      "decoupled_weight_decay": true,
+      "differentiable": false,
+      "eps": 1e-08,
+      "foreach": false,
+      "fused": null,
+      "lr": 0.0001,
+      "maximize": false,
+      "weight_decay": 0.01
+    },
+    "packer": {
+      "datasetCount": 1,
+      "datasetId": 0,
+      "isPrompt": false,
+      "taskId": 1
+    },
+    "parameterOrder": "ordinal-ascii-name",
+    "resample": false,
+    "scheduler": {
+      "gamma": 0.99,
+      "name": "StepLR",
+      "stepSize": 100
+    },
+    "seed": 42,
+    "shuffle": false,
+    "truncate": false,
+    "workers": 0
+  },
+  "recipeSha256": "a30348ef4618c0b698b707149b061ffa0280497ff4c1e09a096b6ae7d7678cf7",
+  "workerFiles": {
+    "checkpoint.py": {
+      "bytes": 23497,
+      "sha256": "ecc70ec38c1de3d3edff2fb6bbebc04bff94f08b84c4c10e9e1f1d21c1904e85"
+    },
+    "frozen_layout.py": {
+      "bytes": 3248,
+      "sha256": "5a3c555ffd60632c22473b5edffe335670854899639be5d75a06fb3874c0ae98"
+    },
+    "mapped_model.py": {
+      "bytes": 11448,
+      "sha256": "8a1eec7fb502ace608f91afc67b72acc906c8ddd6dd723f1a8f4be41f2c3b5f9"
+    },
+    "owned_files.py": {
+      "bytes": 4771,
+      "sha256": "3d421bf379db5d8a0fa1552394cec468b5154b4d1cf0678a4bcba193eb6e4cf5"
+    },
+    "protocol.py": {
+      "bytes": 13283,
+      "sha256": "ba4d3c12ed4ed4fc62b6a66c16fbc83fb77e7c7ac90fd0c72922c2379b9e8dac"
+    },
+    "runtime.py": {
+      "bytes": 2129,
+      "sha256": "162763784296ea0b56b233fdec4daf04a0ac618c6bb818052582a18213780a4a"
+    },
+    "trainer.py": {
+      "bytes": 9590,
+      "sha256": "a0e8e2edc1577c5341bb3abf721c909a9e332af03ffedb1fc0277e33dcb0d77e"
+    },
+    "worker.py": {
+      "bytes": 5981,
+      "sha256": "e863ffbe77aa7e9e50b6f22ee1a0ced66516142a48c57ea689d7c2319b13a439"
+    }
+  },
+  "cache": {
+    "bytes": 9536873992,
+    "sha256": "13859ada0fb8b640049689977f22451a582253322dcf54ada8ca6fb54e042741",
+    "layoutSha256": "1438c3d195145a791bfda894aed22eaed2fccac77b779cd34e540297c297496e"
+  }
+}

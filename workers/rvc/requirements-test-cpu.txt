@@ -1,0 +1,10 @@
+# Short isolated state-continuity tests; not the production RVC runtime lock.
+# Install Torch from https://download.pytorch.org/whl/cpu (no DirectML/CUDA).
+torch==2.10.0+cpu
+numpy==1.26.4
+scipy==1.13.1
+librosa==0.10.2.post1
+transformers==4.49.0
+huggingface-hub==0.36.2
+tokenizers==0.21.4
+safetensors==0.8.0

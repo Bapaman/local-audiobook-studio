@@ -1,0 +1,85 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <WindowsSdkPackageVersion>10.0.26100.57</WindowsSdkPackageVersion>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <PublishTrimmed>false</PublishTrimmed>
+    <DefaultItemExcludes>$(DefaultItemExcludes);ClientApp\**</DefaultItemExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LocalAudiobookStudio.Application\LocalAudiobookStudio.Application.csproj" />
+    <ProjectReference Include="..\LocalAudiobookStudio.Web\LocalAudiobookStudio.Web.csproj" />
+    <ProjectReference Include="..\LocalAudiobookStudio.WorkerHost\LocalAudiobookStudio.WorkerHost.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="LocalAudiobookStudio.App.Tests" />
+    <Content Include="..\TtsCorpusWorker\worker.py;..\TtsCorpusWorker\protocol.py;..\TtsCorpusWorker\prepare.py;..\TtsCorpusWorker\asr.py"
+             Link="TtsCorpusWorker\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\eng\locks\whisper-large-v3-turbo.lock.json" Link="locks\whisper-large-v3-turbo.lock.json"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\VoxCpmTrainingWorker\worker.py;..\VoxCpmTrainingWorker\protocol.py;..\VoxCpmTrainingWorker\trainer.py;..\VoxCpmTrainingWorker\runtime.py;..\VoxCpmTrainingWorker\owned_files.py;..\VoxCpmTrainingWorker\mapped_model.py;..\VoxCpmTrainingWorker\frozen_layout.py;..\VoxCpmTrainingWorker\checkpoint.py"
+             Link="VoxCpmTrainingWorker\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\eng\locks\voxcpm2-training.lock.json" Link="locks\voxcpm2-training.lock.json"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\VoxCpmInferenceWorker\worker.py;..\VoxCpmInferenceWorker\inference_contract.py;..\VoxCpmInferenceWorker\mapped_backend.py;..\VoxCpmInferenceWorker\synthesis.py"
+             Link="VoxCpmInferenceWorker\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\eng\locks\voxcpm2-inference.lock.json" Link="locks\voxcpm2-inference.lock.json"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="CopyManagedWorkerPayload" AfterTargets="Build" BeforeTargets="ComputeFilesToPublish">
+    <MSBuild Projects="..\LocalAudiobookStudio.WorkerHost\LocalAudiobookStudio.WorkerHost.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_ManagedWorkerTarget" />
+    </MSBuild>
+    <ItemGroup>
+      <_ManagedWorkerPayload Include="@(_ManagedWorkerTarget->'%(RootDir)%(Directory)LocalAudiobookStudio.WorkerHost.exe');@(_ManagedWorkerTarget->'%(RootDir)%(Directory)LocalAudiobookStudio.WorkerHost.deps.json');@(_ManagedWorkerTarget->'%(RootDir)%(Directory)LocalAudiobookStudio.WorkerHost.runtimeconfig.json')" />
+    </ItemGroup>
+    <!-- The referenced DLL and its transitive managed closure are copied by the SDK. -->
+    <Copy SourceFiles="@(_ManagedWorkerPayload)" DestinationFolder="$(OutDir)" />
+    <ItemGroup>
+      <!-- SDK publishes the referenced apphost from obj, not its bin copy.
+           Adding the bin executable again would cause NETSDK1152. -->
+      <_ManagedWorkerPublishPayload Include="@(_ManagedWorkerTarget->'%(RootDir)%(Directory)LocalAudiobookStudio.WorkerHost.deps.json');@(_ManagedWorkerTarget->'%(RootDir)%(Directory)LocalAudiobookStudio.WorkerHost.runtimeconfig.json')" />
+      <ResolvedFileToPublish Include="@(_ManagedWorkerPublishPayload)" RelativePath="%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+  <Target Name="BuildStudioClientOnBuild" BeforeTargets="BeforeBuild"
+          Condition="'$(BuildStudioClient)' == 'true' Or '$(_IsPublishing)' == 'true'" DependsOnTargets="BuildStudioClientAssets" />
+  <Target Name="BuildStudioClientOnPublish" BeforeTargets="ComputeFilesToPublish"
+          DependsOnTargets="BuildStudioClientAssets" />
+  <Target Name="BuildStudioClientAssets"
+          DependsOnTargets="CheckStudioClientAssets"
+          Inputs="ClientApp\package-lock.json;ClientApp\package.json;ClientApp\index.html;ClientApp\tsconfig.json;ClientApp\vite.config.ts;..\..\scripts\app\client-assets.mjs;@(StudioClientSource)"
+          Outputs="wwwroot\index.html;$(_StudioClientIncompleteOutput)">
+    <Exec Command="npm ci" WorkingDirectory="$(MSBuildProjectDirectory)\ClientApp" />
+    <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)\ClientApp" />
+  </Target>
+  <Target Name="CheckStudioClientAssets">
+    <Exec Command="node &quot;$(MSBuildProjectDirectory)\..\..\scripts\app\client-assets.mjs&quot; &quot;$(MSBuildProjectDirectory)\wwwroot&quot;" IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="_StudioClientCompletenessExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <!-- A fresh nonexistent output forces the incremental target to rebuild.
+           No sentinel is written. This check
+           runs only as a dependency of the opted-in client/publish target. -->
+      <_StudioClientIncompleteOutput Condition="'$(_StudioClientCompletenessExitCode)' != '0'">$(IntermediateOutputPath)client-assets-$([System.Guid]::NewGuid()).missing</_StudioClientIncompleteOutput>
+    </PropertyGroup>
+  </Target>
+  <ItemGroup>
+    <StudioClientSource Include="ClientApp\src\**\*.ts;ClientApp\src\**\*.tsx;ClientApp\src\**\*.css" />
+  </ItemGroup>
+  <!-- Rebuild before refreshing Content, then let the SDK discover only the fresh files.
+       AssignTargetPaths alone is too late: static asset discovery also runs before it. -->
+  <Target Name="IncludeStudioClientAssets" BeforeTargets="ResolveProjectStaticWebAssets;AssignTargetPaths;ComputeFilesToPublish"
+          DependsOnTargets="BuildStudioClientOnBuild">
+    <ItemGroup>
+      <!-- Remove evaluated items by identity, including files Vite has already deleted. -->
+      <Content Remove="@(Content)" Condition="$([System.String]::Copy('%(Content.Identity)').Replace('\', '/').StartsWith('wwwroot/'))" />
+      <Content Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+</Project>

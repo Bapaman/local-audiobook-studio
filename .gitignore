@@ -1,0 +1,62 @@
+.tools/
+.venv-spike/
+.artifacts/
+.superpowers/
+TestResults/
+output/
+tmp/
+**/node_modules/
+**/wwwroot/
+
+# Local runtime descriptors, credentials and editor state.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
+*.local.json
+private-session*.json
+host-process.json
+/runtime-config.json
+/runtime-config.*.json
+/local-runtime*.json
+/Запуск студии VoxCPM2.cmd
+/Как открыть студию — 17 октября.txt
+/Что проверить в расшифровке — 17 октября.txt
+/Голос из полной записи — 25 октября 2026/
+
+# Private voice references and transcripts must never enter source control.
+local-test-data/
+/Промежуточные аудио/
+/Прослушивание личной модели — 13 октября 2026/
+/Подготовка полной записи — 16 октября 2026/
+/Запустить студию обучения.cmd
+/Открыть проект обучения.cmd
+
+*.gguf
+*.safetensors
+*.pth
+*.wav
+*.m4a
+*.csv
+
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.coverage
+htmlcov/
+*.egg-info/
+
+# .NET and WinUI generated build output.
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><UseAppHost>true</UseAppHost></PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="LocalAudiobookStudio.WorkerHost.Tests" />
+    <ProjectReference Include="..\LocalAudiobookStudio.Contracts\LocalAudiobookStudio.Contracts.csproj" />
+    <ProjectReference Include="..\LocalAudiobookStudio.Audio\LocalAudiobookStudio.Audio.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voxcpm2-spike-evaluator"
+version = "0.1.0"
+description = "Offline evaluation primitives for the VoxCPM2 Windows inference spike"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "numpy==2.2.6",
+  "scipy==1.15.3",
+  "soundfile==0.13.1",
+]
+
+[project.optional-dependencies]
+test = [
+  "jsonschema==4.25.1",
+  "pytest==8.4.2",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers"
+pythonpath = ["src"]
+testpaths = ["tests"]
+

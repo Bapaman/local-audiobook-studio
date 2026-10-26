@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "artifact": "VoxCPM2",
+  "kind": "huggingface",
+  "repository": "openbmb/VoxCPM2",
+  "revision": "32279effe8c19989596f05d353d1447f51d9e915",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "length": 1519,
+      "sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+      "lfsSha256": null
+    },
+    {
+      "path": "audiovae.pth",
+      "length": 376951122,
+      "sha256": "94b5d51e107e0507d4acc976cfdadb64edd6fd06d1f751dadbf2fd1594274bf1",
+      "lfsSha256": "94b5d51e107e0507d4acc976cfdadb64edd6fd06d1f751dadbf2fd1594274bf1"
+    },
+    {
+      "path": "config.json",
+      "length": 4336,
+      "sha256": "405f0dcd92f7feba6011ed4eac5c8d4f74cba9712f07fd5cfa3063bbdd95402c",
+      "lfsSha256": null
+    },
+    {
+      "path": "model.safetensors",
+      "length": 4580080592,
+      "sha256": "f7f964cfa9da23653baec6e6f7750719977ad944ed9f95fe52fe3a620506891d",
+      "lfsSha256": "f7f964cfa9da23653baec6e6f7750719977ad944ed9f95fe52fe3a620506891d"
+    },
+    {
+      "path": "README.md",
+      "length": 7939,
+      "sha256": "c18d2ffbfb2f0aec770481c967842aee6c200cde65f6b033efd892a849986fda",
+      "lfsSha256": null
+    },
+    {
+      "path": "special_tokens_map.json",
+      "length": 1632,
+      "sha256": "068594063e37662c02b21acf42ebb334ef6a74fb810e68a2368f88f08351de76",
+      "lfsSha256": null
+    },
+    {
+      "path": "tokenization_voxcpm2.py",
+      "length": 2895,
+      "sha256": "84489ea32b6ee0cae22ed5480cacb6df85c46624c3119be9a2021c3649a12729",
+      "lfsSha256": null
+    },
+    {
+      "path": "tokenizer_config.json",
+      "length": 5059,
+      "sha256": "e78a3ebb48a0b9437efd1823b6b726c823da89e49dd8bcc90c02419d9baa772b",
+      "lfsSha256": null
+    },
+    {
+      "path": "tokenizer.json",
+      "length": 3676772,
+      "sha256": "f8984687e4a92a3503d521396d454b7d68e9fdaab2a0288eb3536c7c1aa4bc20",
+      "lfsSha256": null
+    }
+  ],
+  "downloader": {
+    "python": "Python 3.11.9",
+    "huggingFaceHub": "0.36.0",
+    "transport": "ModelScope",
+    "modelScopeHub": "0.4.5",
+    "modelScopeRepository": "OpenBMB/VoxCPM2",
+    "modelScopeRevision": "519da200db2bc31a0395635fc7042653b9c4c862",
+    "requirementsFreezeSha256": "d6b4aff92d1a485e538a2ee793c7482147462e34a705a5aa98bd9d6fba68450c"
+  },
+  "converter": {
+    "repository": "https://github.com/tc-mb/llama.cpp-omni.git",
+    "tag": "b267",
+    "commit": "873056743b74e1a4ce5dcf7290e2298428e214db",
+    "script": "tools/omni/voxcpm2/convert_voxcpm2_to_gguf.py"
+  },
+  "generated": {
+    "manifest": "generated-manifest.json",
+    "files": [
+      {
+        "name": "VoxCPM2-BaseLM-F16.gguf",
+        "role": "BaseLM",
+        "format": "F16",
+        "length": 3247980544,
+        "sha256": "8be62e899f8f32b3c2109c99950b46671135a8f40b27b1df720f6823d36cc59e"
+      },
+      {
+        "name": "VoxCPM2-Acoustic-F16.gguf",
+        "role": "Acoustic",
+        "format": "F16",
+        "length": 1825096352,
+        "sha256": "5bde898488ad635ff55d24da53543768fa33d5e5cdc538ce190e5ef831038e85"
+      },
+      {
+        "name": "VoxCPM2-BaseLM-F32.gguf",
+        "role": "BaseLM",
+        "format": "F32",
+        "length": 6492078080,
+        "sha256": "ed986b9319157a2ae7b03dea11343d15ad8704731b539980c61df73ca5e84c2c"
+      },
+      {
+        "name": "VoxCPM2-Acoustic-F32.gguf",
+        "role": "Acoustic",
+        "format": "F32",
+        "length": 3649805600,
+        "sha256": "60cefb5100e5b327052cd63dabcdbcd5350cc25a06b3049de600849ead8b5619"
+      },
+      {
+        "name": "VoxCPM2-BaseLM-Q8_0.gguf",
+        "role": "BaseLM",
+        "format": "Q8_0",
+        "length": 1727309920,
+        "sha256": "1d15067053904137d93d633535e34a461f0c20397c41a610e6f4247aba97ba6c"
+      }
+    ]
+  }
+}
