@@ -91,6 +91,9 @@ public sealed class VoxCpmInferenceNativeTests
         {
             var error = await Assert.ThrowsAsync<WorkerClientException>(() => executor.RunAsync(f.Execution,_=>Task.CompletedTask,deadline.Token));
             Assert.NotEqual("worker.canceled", error.Code);
+            if (fault is "memory" or "recheck") Assert.Equal("worker.memory.insufficient", error.Code);
+            if (fault == "reserve") Assert.Equal("worker.memory.reserve", error.Code);
+            if (fault == "limits") Assert.Equal("worker.memory.policy", error.Code);
             Assert.True(error.CleanupConfirmed);
             if (fault == "memory") { Assert.Null(launcher.StartInfo); Assert.Equal(0,inventory.Opened); }
             if (fault is "memory" or "recheck" or "reserve" or "deadline" or "limits" or "gate-eof" or "gate-order") Assert.False(launcher.Child.SawStart);

@@ -34,7 +34,8 @@ public sealed class WorkerClientException : Exception
         "worker.output.missing" or "worker.output.exists" or "worker.output.limit" or "worker.arguments" or "worker.path" or "worker.artifacts" or
         "worker.developer.required" or "worker.profile" or "worker.storage" or "worker.cleanup" or "worker.launch" or
         "worker.unsupported.platform" or "worker.configuration" or "worker.internal" or "worker.authentication" or
-        "worker.busy" or "worker.runtime.not_ready" or "worker.interrupted" or "protocol.command" or "protocol.payload" or
+        "worker.busy" or "worker.runtime.not_ready" or "worker.memory.insufficient" or "worker.memory.reserve" or "worker.memory.policy"
+            or "worker.interrupted" or "protocol.command" or "protocol.payload" or
         "protocol.frame" or "protocol.version" => code,
         _ => "worker.internal"
     };

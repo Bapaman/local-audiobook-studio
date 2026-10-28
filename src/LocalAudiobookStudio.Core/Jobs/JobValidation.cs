@@ -96,5 +96,12 @@ internal static class JobValidation
         Require(state switch { JobState.Queued or JobState.Preparing or JobState.Running => requested == JobRequestedState.Run, JobState.Paused or JobState.PauseRequested => requested == JobRequestedState.Pause, JobState.Canceled or JobState.CancelRequested => requested == JobRequestedState.Cancel, _ => true });
     }
     private static bool Phase(string? phase) => phase is "queued" or "preparing" or "validating_inputs" or "generating" or "validating_output" or "publishing" or "retrying_cpu" or "paused" or "interrupted" or "canceled" or "failed" or "completed";
-    private static bool Code(string? code) => code is null or "worker.canceled" or "worker.timeout" or "worker.crash" or "worker.cuda.oom" or "worker.output.invalid" or "worker.output.missing" or "worker.output.exists" or "worker.arguments" or "worker.path" or "worker.artifacts" or "worker.developer.required" or "worker.profile" or "worker.storage" or "worker.cleanup" or "worker.launch" or "worker.unsupported.platform" or "worker.configuration" or "worker.internal" or "worker.authentication" or "worker.busy" or "protocol.command" or "protocol.payload" or "protocol.frame" or "protocol.version" or "worker.runtime.not_ready" or "worker.interrupted" or "job.interrupted" or "project.interrupted" or "job.input_changed" or "job.input.invalid";
+    private static bool Code(string? code) => code is null or "worker.canceled" or "worker.timeout" or "worker.crash" or "worker.cuda.oom"
+        or "worker.memory.insufficient" or "worker.memory.reserve" or "worker.memory.policy"
+        or "worker.output.invalid" or "worker.output.missing" or "worker.output.exists" or "worker.arguments" or "worker.path"
+        or "worker.artifacts" or "worker.developer.required" or "worker.profile" or "worker.storage" or "worker.cleanup"
+        or "worker.launch" or "worker.unsupported.platform" or "worker.configuration" or "worker.internal"
+        or "worker.authentication" or "worker.busy" or "protocol.command" or "protocol.payload" or "protocol.frame"
+        or "protocol.version" or "worker.runtime.not_ready" or "worker.interrupted" or "job.interrupted"
+        or "project.interrupted" or "job.input_changed" or "job.input.invalid";
 }

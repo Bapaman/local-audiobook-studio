@@ -9,8 +9,13 @@ namespace LocalAudiobookStudio.App.VoxCpmTraining;
 internal sealed class VoxCpmTrainingFilePins : IDisposable
 {
     private readonly List<IDisposable> owned = [];
-    private readonly HashSet<string> directories = new(StringComparer.OrdinalIgnoreCase);
+    // Case-sensitive Windows directories can contain distinct objects for each
+    // spelling. Only an exact spelling may reuse an already checked handle.
+    private readonly HashSet<string> directories = new(StringComparer.Ordinal);
     internal static string Absolute(string path) => WorkerPaths.Root(LocalAppHostDependencies.CanonicalLocalRoot(path));
+    // Names alone grant no authority. PinDirectory/Open check the actual objects
+    // and retain their handles for this owner's entire lifetime.
+    internal static string LexicalAbsolute(string path) => LocalAppHostDependencies.CanonicalLocalRoot(path);
     internal static string Resolve(string root, string relative)
     {
         if (relative.Length is < 1 or > 2048 || relative.Contains('\\') || relative.Any(char.IsControl)) throw Invalid();
@@ -18,13 +23,15 @@ internal sealed class VoxCpmTrainingFilePins : IDisposable
     }
     internal void PinDirectory(string path)
     {
-        path = Absolute(path); var chain = new Stack<string>();
-        for (string? item = path; item != null; item = Path.GetDirectoryName(item)) chain.Push(item);
+        path = LexicalAbsolute(path); var chain = new Stack<string>();
+        for (string? item = path; item != null && !directories.Contains(item); item = Path.GetDirectoryName(item)) chain.Push(item);
         while (chain.TryPop(out string? item))
         {
-            if (!directories.Add(item)) continue;
-            var handle = CreateFileW(Extended(item), 1, 3, 0, 3, 0x02200000, 0);
+            // Deny delete and data-write sharing: a retained ancestor cannot be
+            // moved or converted in place to a reparse point after its check.
+            var handle = CreateFileW(Extended(item), 1, 1, 0, 3, 0x02200000, 0);
             owned.Add(handle); Check(handle, true);
+            directories.Add(item);
         }
     }
     internal async Task<FileStream> ReadAsync(string path, long maximum, string? sha, CancellationToken token)
@@ -39,7 +46,7 @@ internal sealed class VoxCpmTrainingFilePins : IDisposable
     internal void PinCreatedFile(FileStream stream) { owned.Add(stream); Check(stream.SafeFileHandle, false); }
     private FileStream Open(string path, uint access, uint share, uint disposition, FileAccess fileAccess)
     {
-        path = Absolute(path); PinDirectory(Path.GetDirectoryName(path)!);
+        path = LexicalAbsolute(path); PinDirectory(Path.GetDirectoryName(path)!);
         var handle = CreateFileW(Extended(path), access, share, 0, disposition, 0x00200000, 0);
         int error = Marshal.GetLastWin32Error(); owned.Add(handle);
         if (handle.IsInvalid && share == 0 && error is 32 or 33) throw new VoxCpmTrainingExecutionException("voxcpm_training.cache.busy");

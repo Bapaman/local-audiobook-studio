@@ -179,7 +179,7 @@ internal sealed class VoxCpmTrainingRuntimeInventory : IVoxCpmTrainingRuntimeInv
         foreach (var entry in entries.EnumerateArray())
         {
             Fields(entry, "path", "bytes", "sha256");
-            string path = VoxCpmTrainingFilePins.Absolute(Text(entry.GetProperty("path")));
+            string path = VoxCpmTrainingFilePins.LexicalAbsolute(Text(entry.GetProperty("path")));
             Require(files.TryAdd(path, (Integer(entry.GetProperty("bytes"), 0, 17179869184), Hash(entry.GetProperty("sha256")))));
         }
         HashSet<string> Required()
@@ -187,9 +187,9 @@ internal sealed class VoxCpmTrainingRuntimeInventory : IVoxCpmTrainingRuntimeInv
             var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string directory in new[] { options.PythonBaseRoot, options.WorkerRoot }.Concat(options.DependencySites))
                 foreach (string file in Enumerate(pins, directory)) set.Add(file);
-            string python = VoxCpmTrainingFilePins.Absolute(options.PythonPath), interpreter = Path.GetDirectoryName(python)!;
+            string python = VoxCpmTrainingFilePins.LexicalAbsolute(options.PythonPath), interpreter = Path.GetDirectoryName(python)!;
             pins.PinDirectory(interpreter); set.Add(python);
-            foreach (string file in Directory.EnumerateFiles(interpreter)) set.Add(VoxCpmTrainingFilePins.Absolute(file));
+            foreach (string file in Directory.EnumerateFiles(interpreter)) set.Add(VoxCpmTrainingFilePins.LexicalAbsolute(file));
             if (Path.GetFileName(interpreter).Equals("Scripts", StringComparison.OrdinalIgnoreCase)) set.Add(Path.Combine(Path.GetDirectoryName(interpreter)!, "pyvenv.cfg"));
             else Require(Within(python, options.PythonBaseRoot));
             return set;
@@ -234,14 +234,14 @@ internal sealed class VoxCpmTrainingRuntimeInventory : IVoxCpmTrainingRuntimeInv
 
     private static IEnumerable<string> Enumerate(VoxCpmTrainingFilePins pins, string directory, bool rejectBytecode = false)
     {
-        var pending = new Stack<string>(); pending.Push(VoxCpmTrainingFilePins.Absolute(directory)); int count = 0;
+        var pending = new Stack<string>(); pending.Push(VoxCpmTrainingFilePins.LexicalAbsolute(directory)); int count = 0;
         while (pending.TryPop(out string? current))
         {
             pins.PinDirectory(current);
             foreach (string path in Directory.EnumerateFileSystemEntries(current))
             {
                 Require(++count <= 150000);
-                string canonical = VoxCpmTrainingFilePins.Absolute(path);
+                string canonical = VoxCpmTrainingFilePins.LexicalAbsolute(path);
                 Require(!rejectBytecode || !Path.GetFileName(canonical).Equals("__pycache__", StringComparison.OrdinalIgnoreCase));
                 if (Directory.Exists(canonical)) pending.Push(canonical); else yield return canonical;
             }

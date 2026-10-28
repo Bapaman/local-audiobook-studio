@@ -96,6 +96,9 @@ internal sealed class VoxCpmInferenceNativeExecutor(VoxCpmInferenceRuntime runti
     private async Task VerifyCache(VoxCpmTrainingCacheLease cache)
     {try{await cache.VerifyUnchangedAsync(CancellationToken.None);}catch{runtime.Training.MarkCacheChanged();throw new WorkerClientException("worker.runtime.not_ready",true);}}
     private static WorkerClientException Map(VoxCpmTrainingExecutionException e)=>new(e.Code switch {
+        "voxcpm_training.memory.insufficient"=>"worker.memory.insufficient",
+        "voxcpm_training.memory.reserve"=>"worker.memory.reserve",
+        "voxcpm_training.memory.policy"=>"worker.memory.policy",
         "voxcpm_training.window.deadline"=>"worker.timeout","voxcpm_training.cache.busy"=>"worker.busy",
         "voxcpm_training.protocol.invalid" or "voxcpm_training.file.invalid"=>"worker.output.invalid",_=>"worker.runtime.not_ready"},e.CleanupConfirmed);
     private static Task Stop(IVoxCpmTrainingOwnedProcess child)=>child.StopTreeAsync().WaitAsync(TimeSpan.FromSeconds(12));

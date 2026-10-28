@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { StudioClient } from '../../api/client';
 import type { JobSnapshot, SnapshotResponse, VoxCpmTrainingSnapshot } from '../../api/types';
 import { GenerationPanel } from './GenerationPanel';
+import { JobProgress } from './JobProgress';
 import { useProjectEvents } from './useProjectEvents';
 import { TestEventSource } from '../../test-events';
 
@@ -31,6 +32,18 @@ async function select(user = userEvent.setup()) {
 }
 beforeEach(() => { localStorage.clear(); serveReferences(); });
 afterEach(() => { localStorage.clear(); });
+
+it.each([
+  ['worker.memory.insufficient', 'Для озвучивания нужно не менее 16 ГиБ свободной оперативной памяти. Освободите память перед новой пробой.'],
+  ['worker.memory.reserve', 'Озвучивание остановлено, чтобы оставить память системе. Готовые результаты сохранены.'],
+  ['worker.memory.policy', 'Не удалось подтвердить ограничения памяти и процессора. Озвучивание остановлено.'],
+])('shows the actionable synthesis resource error %s in job history', (diagnosticCode, message) => {
+  const job: JobSnapshot = { id: 'failed1', projectId: 'book1', kind: 'preview', state: 'failed', requestedState: 'run', phase: 'failed',
+    completedUnits: 0, totalUnits: 1, revision: 3, createdUtc: '', updatedUtc: '', completedUtc: '', diagnosticCode,
+    inputHash: 'hash', effectiveProfileId: 'voxcpm2-saved-adapter-controls-cpu-v1' };
+  render(<JobProgress job={job} pending={false} control={vi.fn()} />);
+  expect(screen.getByText(message)).toBeVisible();
+});
 
 it('shows defaults, approved audio, edits engine/export controls and sends captured options', async () => {
   const state = generation(); render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);

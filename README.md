@@ -64,4 +64,6 @@ docs/      описание проекта
 
 [Запуск на другом компьютере](docs/SETUP.md) · [Проверки](docs/TESTING.md) · [Внешние компоненты](THIRD_PARTY_NOTICES.md)
 
+[Как подбирать голос и менять настройки генерации](docs/GENERATION.md)
+
 [Презентация и материалы выступления](docs/presentation/README.md)

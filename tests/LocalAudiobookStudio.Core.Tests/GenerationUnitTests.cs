@@ -465,6 +465,7 @@ public class GenerationUnitTests
 
     [Theory]
     [InlineData("worker.timeout", true)] [InlineData("worker.crash", true)] [InlineData("worker.cuda.oom", false)]
+    [InlineData("worker.memory.insufficient", true)] [InlineData("worker.memory.reserve", true)] [InlineData("worker.memory.policy", true)]
     public async Task Retry_requires_hybrid_oom_and_immutable_permission(string code, bool allowed)
     {
         using var box = new ProjectSandbox(); await using var db = await ProjectJobStoreTests.Prepared(box);
@@ -474,6 +475,7 @@ public class GenerationUnitTests
         var claim = (await lease.BeginGenerationUnitAsync(job.Id, input.Items[0].SegmentId, input.Preset, Token))!;
         await Assert.ThrowsAsync<ProjectException>(() => lease.FailGenerationUnitAsync(claim, code, GenerationFailureDisposition.RetryCpu, Token));
         job = await lease.FailGenerationUnitAsync(claim, code, Token); Assert.Equal(JobState.Failed, job.State);
+        Assert.Equal(code, (await db.Jobs.GetAsync(job.Id, Token)).DiagnosticCode);
         Assert.False((await db.Jobs.ItemsAsync(job.Id, Token))[0].CpuFallbackUsed);
         Assert.Null(await lease.BeginGenerationUnitAsync(job.Id, claim.SegmentId, input.Preset, Token));
     }
