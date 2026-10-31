@@ -4,7 +4,7 @@ import type { SavedVoiceSelection, SnapshotResponse, TrainingReadiness, Training
 import { JobProgress } from './JobProgress';
 import { terminal, type GenerationState } from './useProjectEvents';
 import { VoxCpmControls, useVoxCpmReferences } from './VoxCpmControls';
-import { loadVoxDraft, saveVoxDraft, validVoxOptions } from './voxCpmOptions';
+import { latestSuccessfulVoxSettings, loadVoxDraft, saveVoxDraft, validVoxOptions } from './voxCpmOptions';
 
 type Props = { current: SnapshotResponse; generation: GenerationState; busy: boolean; training?: TrainingSnapshot | null; trainingReadiness?: TrainingReadiness; voxTraining?: VoxCpmTrainingSnapshot | null; client?: StudioClient };
 export function GenerationPanel(props: Props) {
@@ -20,8 +20,10 @@ function GenerationPanelContent({ current, generation, busy, training, trainingR
   const previewId = snapshot.segments.some(segment => segment.id === preview) ? preview : snapshot.segments[0]?.id;
   const [selectedModelId, setSelectedModelId] = useState(draft.modelId);
   const [options, setOptions] = useState<VoxCpmGenerationOptions>(draft.options);
+  const [selectionKnown, setSelectionKnown] = useState(draft.selectionKnown);
+  const [restored, setRestored] = useState(false);
   const [modelConfirmed, setModelConfirmed] = useState(false);
-  useEffect(() => saveVoxDraft(snapshot.id, selectedModelId, options), [snapshot.id, selectedModelId, options]);
+  useEffect(() => { if (selectionKnown) saveVoxDraft(snapshot.id, selectedModelId, options); }, [snapshot.id, selectedModelId, options, selectionKnown]);
   const versions = training?.projectId === snapshot.id && training.sourceRecordingId === snapshot.voiceRecording?.artifactId ? training.models : [];
   const voxVersions = voxTraining?.projectId === snapshot.id ? voxTraining.models : [];
   const isVox = selectedModelId.startsWith('voxcpm:');
@@ -31,6 +33,12 @@ function GenerationPanelContent({ current, generation, busy, training, trainingR
   const referenceReady = !options.useReference || !!referenceCatalog?.clips.some(clip => clip.id === (options.referenceClipId ?? referenceCatalog.defaultClipId));
   const selectedModel = isVox ? selectedVox : versions.find(model => model.id === selectedModelId && model.selectable === true);
   const active = generation.jobs.some(job => !terminal(job));
+  useEffect(() => {
+    if (selectionKnown || active || busy || generation.pending) return;
+    const previous = latestSuccessfulVoxSettings(generation.jobs, snapshot.id, new Set(voxVersions.map(model => model.id)));
+    if (!previous) return;
+    setSelectedModelId(`voxcpm:${previous.modelId}`); setOptions(previous.options); setSelectionKnown(true); setRestored(true);
+  }, [selectionKnown, active, busy, generation.pending, generation.jobs, snapshot.id, voxVersions]);
   const ready = (isVox ? generation.voxReadiness?.ready === true : generation.readiness?.ready) && !!snapshot.voiceAnchor && !!snapshot.textDocument;
   const savedReady = !selectedModelId || (!!selectedModel && modelConfirmed && (isVox ? validVoxOptions(options) && referenceReady : trainingReadiness?.ready === true));
   const disabled = busy || generation.pending || active || !ready || !savedReady;
@@ -40,7 +48,7 @@ function GenerationPanelContent({ current, generation, busy, training, trainingR
     : { savedModelId: selectedModelId, experimentalConfirmed: modelConfirmed } : undefined;
   function reuse(info: VoxCpmGenerationInfo) {
     if (!validVoxOptions(info.options)) return;
-    setSelectedModelId(`voxcpm:${info.modelId}`); setOptions({ ...info.options }); setModelConfirmed(false);
+    setSelectedModelId(`voxcpm:${info.modelId}`); setOptions({ ...info.options }); setModelConfirmed(false); setSelectionKnown(true); setRestored(false);
   }
   const bookReady = snapshot.segments.length > 0 && snapshot.segments.length <= 256 && snapshot.segments.every(segment => !!segment.outputArtifactId);
   return <section className="panel generation-panel" aria-labelledby="generation-heading">
@@ -51,19 +59,20 @@ function GenerationPanelContent({ current, generation, busy, training, trainingR
       : !generation.readiness ? <p role="status">Проверяем движок озвучивания…</p> : !generation.readiness.ready ? <p className="notice">Движок озвучивания не настроен. Генерация станет доступна после установки и проверки локальной модели.</p> : <p className="subtle">Движок подключён · {generation.readiness.profileId === 'q8-f16-cpu' ? 'CPU' : 'CPU + GPU'}{generation.readiness.experimental ? ' · экспериментальный режим' : ''}</p>}
     <p>Озвучивается сохранённый произносимый текст. Сначала сохраните правки и подтвердите голосовой фрагмент.</p>
     {isVox && <p className="subtle">Для запуска пока также нужен подтверждённый короткий образец голоса 10–20 секунд в подготовке проекта, даже при использовании клипа из корпуса.</p>}
-    <label htmlFor="generation-voice">Голос для озвучивания</label><select id="generation-voice" value={selectedModelId} disabled={choiceDisabled} onChange={event => { setSelectedModelId(event.target.value); setModelConfirmed(false); setOptions(previous => ({ ...previous, referenceClipId: null })); }}>
+    <label htmlFor="generation-voice">Голос для озвучивания</label><select id="generation-voice" value={selectedModelId} disabled={choiceDisabled} onChange={event => { setSelectedModelId(event.target.value); setModelConfirmed(false); setOptions(previous => ({ ...previous, referenceClipId: null })); setSelectionKnown(true); setRestored(false); }}>
       <option value="">Короткий подтверждённый образец</option>
       {versions.map((model, index) => <option key={model.id} value={model.id} disabled={model.selectable !== true}>Версия {index + 1} · шаг {model.globalStep} · эпоха {model.completedEpoch}{model.selectable === true ? '' : ' · недоступна для озвучивания'}</option>)}
       {voxVersions.length > 0 && <optgroup label="VoxCPM2 — обученный голос">{voxVersions.map(model => <option key={model.id} value={`voxcpm:${model.id}`}>VoxCPM2 · шаг {model.globalStep} · проходов {model.completedEpochs} · {model.id.slice(0, 8)}</option>)}</optgroup>}
       {selectedModelId && !(isVox ? selectedVox : versions.some(model => model.id === selectedModelId)) && <option value={selectedModelId} disabled>Выбранная версия недоступна</option>}
     </select>
+    {restored && <p className="subtle" role="status">Восстановлены настройки последней успешной пробы. Новое озвучивание запустится только по вашей команде.</p>}
     {!!selectedModelId && <>
       <p className="notice">{isVox ? 'Сохранённая модель VoxCPM2 использует обученные изменения и, по вашему выбору, опорный фрагмент из той же подтверждённой записи, чтобы закрепить тембр. Сначала прослушайте пробу: сходство голоса пока не подтверждено.' : 'Сначала текст озвучивается по короткому образцу, затем сохранённая модель RVC преобразует голос. Всё ещё нужен подтверждённый фрагмент 10–20 секунд и его точный текст. Качество результата не проверено; начните с пробы.'}</p>
       <label className="check-label"><input type="checkbox" checked={modelConfirmed} disabled={choiceDisabled} onChange={event => setModelConfirmed(event.target.checked)} />Подтверждаю экспериментальное применение сохранённой модели: качество голоса не гарантируется.</label>
       {!selectedModel && <p className="notice warning">Выбранная версия недоступна для озвучивания. Выберите другую версию или короткий образец.</p>}
       {!isVox && trainingReadiness?.ready !== true && <p className="notice warning">Для сохранённой модели нужен готовый локальный движок обучения и преобразования голоса.</p>}
     </>}
-    {isVox && <VoxCpmControls projectId={snapshot.id} modelId={selectedModelId.slice('voxcpm:'.length)} options={options} onChange={setOptions} disabled={choiceDisabled} references={references} />}
+    {isVox && <VoxCpmControls projectId={snapshot.id} modelId={selectedModelId.slice('voxcpm:'.length)} options={options} onChange={value => { setOptions(value); setSelectionKnown(true); setRestored(false); }} disabled={choiceDisabled} references={references} />}
     {snapshot.segments.length > 0 && <>
       <label htmlFor="preview-segment">Фрагмент для пробы</label><select id="preview-segment" value={previewId ?? ''} onChange={event => setPreview(event.target.value)} disabled={busy || generation.pending}>
         {snapshot.segments.map((segment, index) => <option key={segment.id} value={segment.id}>Фрагмент {index + 1}</option>)}

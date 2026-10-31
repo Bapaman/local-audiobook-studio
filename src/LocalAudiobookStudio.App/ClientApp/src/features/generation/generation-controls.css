@@ -1,0 +1,3 @@
+.tempo-choices { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; }
+.generation-options summary { cursor: pointer; font-weight: 600; padding: .4rem 0; }
+.generation-expert { display: grid; gap: .6rem; padding-top: .6rem; }

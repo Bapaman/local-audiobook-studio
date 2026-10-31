@@ -22,11 +22,17 @@ const vox: VoxCpmTrainingSnapshot = { id: 'train1', projectId: 'book1', revision
 const runtime = { ready: true, experimental: true, diagnosticCode: null, profileId: 'voxcpm2-saved-adapter-cpu-v1' };
 const catalog = (id = model, idClip = clip) => ({ modelId: id, corpusVersionId: 'version1', defaultClipId: idClip, clips: [{ id: idClip, trainingOrdinal: 0, seconds: 12, text: 'Подтверждённый текст.' }] });
 const generation = () => ({ jobs: [] as JobSnapshot[], readiness: { ...runtime, profileId: 'q8-f16-cpu' }, voxReadiness: runtime, pending: false, error: '', connected: true, enqueue: vi.fn().mockResolvedValue(undefined), control: vi.fn().mockResolvedValue(undefined) });
+const successfulJob = (change: Partial<JobSnapshot> = {}): JobSnapshot => ({ id: 'accepted1', projectId: 'book1', kind: 'preview', state: 'completed', requestedState: 'run', phase: 'completed',
+  completedUnits: 1, totalUnits: 1, revision: 4, createdUtc: '2026-10-29T00:00:00Z', updatedUtc: '2026-10-29T00:01:00Z', completedUtc: '2026-10-29T00:01:00Z', diagnosticCode: null,
+  inputHash: 'hash', effectiveProfileId: 'voxcpm2-saved-adapter-controls-cpu-v1',
+  voxCpmGeneration: { modelId: model, globalStep: 29, options: { ...defaults, seed: 321, cfg: 2.4, referenceClipId: clip }, referenceClipId: clip, referenceTrainingOrdinal: 0, referenceSeconds: 12 },
+  audioResults: [{ segmentId: 's1', order: 0, artifactId: 'wave1', seconds: 15, spokenText: 'Фраза.' }], ...change });
 function serveReferences() {
   vi.stubGlobal('fetch', vi.fn(async (path: string) => new Response(JSON.stringify(catalog(path.includes(otherModel) ? otherModel : model, path.includes(otherModel) ? otherClip : clip)))));
 }
 async function select(user = userEvent.setup()) {
   await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), `voxcpm:${model}`);
+  await user.click(screen.getByText('Расширенные настройки'));
   await screen.findByRole('option', { name: /Подтверждённый текст/ });
   return user;
 }
@@ -73,6 +79,7 @@ it('resets defaults, creates crypto seed, persists valid project drafts but neve
   view.unmount(); render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
   expect(screen.getByLabelText('Seed — вариация')).toHaveValue(123456);
   expect(screen.getByLabelText(/Подтверждаю экспериментальное применение/)).not.toBeChecked();
+  await user.click(screen.getByText('Расширенные настройки'));
   await user.click(screen.getByRole('button', { name: 'Сбросить настройки' }));
   expect(screen.getByLabelText('Seed — вариация')).toHaveValue(42);
   await user.clear(screen.getByLabelText('Шаги синтеза')); await user.type(screen.getByLabelText('Шаги синтеза'), '21');
@@ -121,6 +128,7 @@ it('isolates stale reference responses, clears explicit clip on model change and
   const state = generation(); render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
   const user = userEvent.setup(); await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), `voxcpm:${model}`);
   await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), `voxcpm:${otherModel}`);
+  await user.click(screen.getByText('Расширенные настройки'));
   await screen.findByRole('option', { name: /Подтверждённый текст/ }); expect(signal?.aborted).toBe(true);
   await act(async () => { resolve(new Response(JSON.stringify(catalog()))); });
   expect(screen.queryByRole('option', { name: clip })).not.toBeInTheDocument();
@@ -139,12 +147,14 @@ it('blocks missing approved reference without a fallback and freezes settings wh
   await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение/));
   expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeDisabled();
   expect(state.enqueue).not.toHaveBeenCalled();
+  await user.click(screen.getByText('Расширенные настройки'));
   await user.click(screen.getByLabelText('Использовать опорный клип'));
   expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeEnabled();
   const job: JobSnapshot = { id: 'active1', projectId: 'book1', kind: 'preview', state: 'running', requestedState: 'run', phase: 'synthesizing', completedUnits: 0, totalUnits: 1, revision: 1,
     createdUtc: '', updatedUtc: '', completedUtc: null, diagnosticCode: null, inputHash: 'hash', effectiveProfileId: 'voxcpm2-saved-adapter-controls-cpu-v1' };
   view.rerender(<GenerationPanel current={current} generation={{ ...state, jobs: [job] }} busy={false} voxTraining={vox} />);
   expect(screen.getByLabelText('Seed — вариация')).toBeDisabled(); expect(screen.getByLabelText('Голос для озвучивания')).toBeDisabled();
+  expect(screen.getByLabelText('Исходный · 100%')).toBeDisabled();
   await user.click(screen.getByRole('button', { name: 'Отменить задание' })); expect(state.control).toHaveBeenCalledWith(job, 'cancel');
 });
 
@@ -210,4 +220,76 @@ it('keeps all six options in uncertain retry identity and wire, changing any opt
   for (const options of [{ ...defaults, seed: 43 }, { ...defaults, timesteps: 11 }, { ...defaults, cfg: 2.1 }, { ...defaults, tempoPercent: 99 }, { ...defaults, useReference: false }, { ...defaults, referenceClipId: clip }]) await send(options as typeof defaults);
   expect(new Set(calls.slice(1).map(call => new Headers(call.headers).get('Idempotency-Key'))).size).toBe(7);
   expect(JSON.parse(calls[0].body as string).voxCpmOptions).toEqual(defaults);
+});
+
+it('recovers successful server settings after storage loss and delayed model load without consent or generation', async () => {
+  const state = generation(); const accepted = successfulJob();
+  const jobs = [successfulJob({ id: 'failed2', state: 'failed', createdUtc: '2026-11-01T00:00:00Z' }), accepted];
+  const view = render(<GenerationPanel current={current} generation={{ ...state, jobs }} busy={false} voxTraining={null} />);
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue('');
+  view.rerender(<GenerationPanel current={current} generation={{ ...state, jobs }} busy={false} voxTraining={vox} />);
+  await waitFor(() => expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue(`voxcpm:${model}`));
+  expect(screen.getByText(/Восстановлены настройки последней успешной пробы/)).toBeVisible();
+  expect(screen.getByLabelText(/Подтверждаю экспериментальное применение/)).not.toBeChecked();
+  expect(state.enqueue).not.toHaveBeenCalled();
+  await userEvent.setup().click(screen.getByText('Расширенные настройки'));
+  expect(screen.getByLabelText('Seed — вариация')).toHaveValue(321);
+  expect(screen.getByLabelText('CFG')).toHaveValue(2.4);
+  view.unmount(); localStorage.clear();
+  render(<GenerationPanel current={current} generation={{ ...state, jobs }} busy={false} voxTraining={vox} />);
+  await waitFor(() => expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue(`voxcpm:${model}`));
+  expect(state.enqueue).not.toHaveBeenCalled();
+});
+
+it('keeps explicit draft and short-sample choices ahead of successful history across remounts', async () => {
+  localStorage.setItem('voxcpm-generation-draft:book1', JSON.stringify({ modelId: `voxcpm:${otherModel}`, options: { ...defaults, seed: 77 } }));
+  const state = { ...generation(), jobs: [successfulJob()] };
+  const view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue(`voxcpm:${otherModel}`);
+  await userEvent.setup().selectOptions(screen.getByLabelText('Голос для озвучивания'), ''); view.unmount();
+  render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  await waitFor(() => expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue(''));
+  expect(state.enqueue).not.toHaveBeenCalled();
+});
+
+it('never replaces manual edits with late successful history or a foreign or unavailable voice', async () => {
+  const state = generation();
+  const invalid = successfulJob({ id: 'foreign', projectId: 'book2' });
+  const absent = successfulJob({ id: 'absent', voxCpmGeneration: { ...successfulJob().voxCpmGeneration!, modelId: 'e'.repeat(32) } });
+  const malformed = successfulJob({ id: 'bad-options', voxCpmGeneration: { ...successfulJob().voxCpmGeneration!, options: { ...defaults, cfg: 999 } } });
+  const view = render(<GenerationPanel current={current} generation={{ ...state, jobs: [invalid, absent, malformed] }} busy={false} voxTraining={vox} />);
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue('');
+  const user = userEvent.setup(); await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), `voxcpm:${otherModel}`);
+  await user.click(screen.getByText('Расширенные настройки'));
+  await user.clear(screen.getByLabelText('Seed — вариация')); await user.type(screen.getByLabelText('Seed — вариация'), '88');
+  view.rerender(<GenerationPanel current={current} generation={{ ...state, jobs: [successfulJob()] }} busy={false} voxTraining={vox} />);
+  expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue(`voxcpm:${otherModel}`);
+  expect(screen.getByLabelText('Seed — вариация')).toHaveValue(88);
+});
+
+it('starts with simple tempo choices and keeps every other captured option while expert controls stay available', async () => {
+  const options = { ...defaults, seed: 123, cfg: 2.5, referenceClipId: clip };
+  localStorage.setItem('voxcpm-generation-draft:book1', JSON.stringify({ modelId: `voxcpm:${model}`, options }));
+  const state = generation(); render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  await screen.findByLabelText('Аудио опорного клипа');
+  expect(screen.getByLabelText('Seed — вариация')).not.toBeVisible();
+  const user = userEvent.setup(); await user.click(screen.getByLabelText('Чуть медленнее · 90%'));
+  await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение/));
+  await user.click(screen.getByRole('button', { name: 'Проба голоса' }));
+  expect(state.enqueue).toHaveBeenCalledWith('preview', ['s1'], '"2"', { savedVoxCpmModelId: model, experimentalConfirmed: true, voxCpmOptions: { ...options, tempoPercent: 90 } });
+  await user.click(screen.getByText('Расширенные настройки'));
+  expect(screen.getByRole('spinbutton', { name: 'Seed — вариация' })).toHaveValue(123);
+  expect(screen.getByLabelText('Темп экспортируемого аудио, %')).toHaveValue(90);
+});
+
+it('retains all 32 terminal jobs alongside active jobs', async () => {
+  const jobs = Array.from({ length: 32 }, (_, i) => successfulJob({ id: `saved${i}`, createdUtc: new Date(Date.UTC(2026, 8, i + 1)).toISOString() }));
+  const active = successfulJob({ id: 'running', state: 'running', completedUnits: 0, completedUtc: null, createdUtc: '2026-11-01T00:00:00Z', audioResults: null });
+  vi.stubGlobal('fetch', async (path: string) => new Response(JSON.stringify(path.endsWith('/readiness') ? { ...runtime, profileId: path.includes('voxcpm') ? runtime.profileId : 'q8-f16-cpu' }
+    : path.endsWith('/jobs') ? [active, ...jobs] : current.snapshot), { headers: { ETag: '"2"' } }));
+  const client = new StudioClient(), install = vi.fn();
+  const { result } = renderHook(() => useProjectEvents(client, 'book1', install));
+  await waitFor(() => expect(result.current.voxReadiness).toBeDefined());
+  expect(result.current.jobs.filter(job => job.state === 'completed')).toHaveLength(32);
+  expect(result.current.jobs).toHaveLength(33);
 });

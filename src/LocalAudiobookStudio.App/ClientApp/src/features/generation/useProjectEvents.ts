@@ -22,8 +22,9 @@ export function useProjectEvents(client: StudioClient, projectId: string | undef
       const incoming = next.get(previous.id);
       if (!incoming || incoming.revision < previous.revision) next.set(previous.id, previous);
     }
+    let terminalCount = 0;
     owner.jobs = [...next.values()].sort((a, b) => b.createdUtc.localeCompare(a.createdUtc))
-      .filter((job, index) => index < 32 || !terminal(job));
+      .filter(job => !terminal(job) || terminalCount++ < 32);
     setJobs(owner.jobs);
   }
 
