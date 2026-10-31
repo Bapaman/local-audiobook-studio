@@ -10,6 +10,7 @@ export function JobProgress({ job, pending, control, reuse, reuseDisabled }: { j
   const results = job.audioResults?.slice(0, 32) ?? [];
   return <article className="job-progress" aria-label={job.kind === 'preview' ? 'Пробное задание' : 'Задание озвучивания'}>
     <div className="section-heading"><h3>{job.kind === 'preview' ? 'Проба голоса' : 'Озвучивание фрагментов'}</h3><span className="state-badge">{labels[job.state]}</span></div>
+    {job.textTitle && <p>Текст: {job.textTitle}</p>}
     <p role="status">Готово: {job.completedUnits} из {job.totalUnits}</p>
     {job.totalUnits > 0 && <progress aria-label="Прогресс готовых фрагментов" value={job.completedUnits} max={job.totalUnits} />}
     {job.state === 'running' && <p className="subtle">Создаётся текущий фрагмент. Время зависит от компьютера; точный срок пока неизвестен.</p>}

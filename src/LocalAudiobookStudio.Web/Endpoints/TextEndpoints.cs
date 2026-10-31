@@ -13,6 +13,19 @@ public static class TextEndpoints
 {
     public static IEndpointRouteBuilder MapTextEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapPost("/api/projects/{id}/text/append/file", async (HttpContext context, string id, IStudioTextService text) =>
+        {
+            long revision = ApiRequest.Revision(context);
+            var upload = await MultipartUploadReader.ReadAsync<AppendFileMetadata>(context, TextImportService.MaximumFileBytes);
+            using (upload.Content)
+                return ApiRequest.Snapshot(context, await text.AppendFileAsync(id,revision,upload.Metadata.TextId,upload.Metadata.DisplayName,upload.Content,context.RequestAborted));
+        });
+        endpoints.MapPost("/api/projects/{id}/text/append/paste", async (HttpContext context, string id, IStudioTextService text) =>
+        {
+            long revision = ApiRequest.Revision(context);
+            var command = await ApiRequest.JsonAsync<AppendPastedText>(context);
+            return ApiRequest.Snapshot(context,await text.AppendPastedAsync(id,revision,command,context.RequestAborted));
+        });
         endpoints.MapPost("/api/projects/{id}/text/file", async (HttpContext context, string id, IStudioProjectService projects, IStudioTextService text) =>
         {
             long revision = await ApiRequest.CheckRevisionAsync(context, id, projects);
@@ -36,4 +49,5 @@ public static class TextEndpoints
     }
 
     private sealed record FileMetadata(string DisplayName);
+    private sealed record AppendFileMetadata(string DisplayName, string TextId);
 }

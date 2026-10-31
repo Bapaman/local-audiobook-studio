@@ -3,8 +3,9 @@ export interface ProjectListItem { id: string; displayName: string; createdUtc: 
 export interface VoiceRecording { artifactId: string; sha256: string; byteLength: number; durationMilliseconds: number; hasClippingWarning: boolean }
 export interface VoiceAnchor { artifactId: string; startMilliseconds: number; endMilliseconds: number; transcript: string }
 export interface TextDocument { sourceKind: string; displayName: string; encoding: string; sha256: string; byteCount: number; originalText: string; normalizedText: string }
+export interface ProjectTextDocument { id: string; order: number; document: TextDocument; segmentIds: string[] }
 export interface Segment { id: string; order: number; originalText: string; normalizedText: string; spokenText: string; contentHash: string; status: string; outputArtifactId?: string | null }
-export interface ProjectSnapshot { id: string; displayName: string; revision: number; voiceRecording: VoiceRecording | null; voiceAnchor: VoiceAnchor | null; textDocument: TextDocument | null; segments: Segment[]; hasAcceptedText?: boolean; hasAcceptedVoice?: boolean }
+export interface ProjectSnapshot { id: string; displayName: string; revision: number; voiceRecording: VoiceRecording | null; voiceAnchor: VoiceAnchor | null; textDocument: TextDocument | null; segments: Segment[]; textDocuments?: ProjectTextDocument[] | null; hasAcceptedText?: boolean; hasAcceptedVoice?: boolean }
 export interface SnapshotResponse { snapshot: ProjectSnapshot; etag: string }
 export interface ConfirmAnchor { startMilliseconds: number; endMilliseconds: number; transcript: string; pairListenedAndConfirmed: boolean }
 export type JobKind = 'preview' | 'generation';
@@ -18,7 +19,7 @@ export interface VoxCpmReferenceClip { id: string; trainingOrdinal: number; seco
 export interface VoxCpmReferenceCatalog { modelId: string; corpusVersionId: string; defaultClipId: string | null; clips: VoxCpmReferenceClip[] }
 export interface VoxCpmGenerationInfo { modelId: string; globalStep: number; options: VoxCpmGenerationOptions; referenceClipId: string | null; referenceTrainingOrdinal: number | null; referenceSeconds: number | null }
 export interface JobAudioResult { segmentId: string; order: number; artifactId: string; seconds: number; spokenText: string }
-export interface JobSnapshot { id: string; projectId: string; kind: JobKind; state: JobState; requestedState: 'run' | 'pause' | 'cancel'; phase: string; completedUnits: number; totalUnits: number; revision: number; createdUtc: string; updatedUtc: string; completedUtc: string | null; diagnosticCode: string | null; inputHash: string; effectiveProfileId: string; voxCpmGeneration?: VoxCpmGenerationInfo | null; audioResults?: JobAudioResult[] | null }
+export interface JobSnapshot { id: string; projectId: string; kind: JobKind; state: JobState; requestedState: 'run' | 'pause' | 'cancel'; phase: string; completedUnits: number; totalUnits: number; revision: number; createdUtc: string; updatedUtc: string; completedUtc: string | null; diagnosticCode: string | null; inputHash: string; effectiveProfileId: string; voxCpmGeneration?: VoxCpmGenerationInfo | null; audioResults?: JobAudioResult[] | null; textTitle?: string | null }
 export interface JobResponse { snapshot: JobSnapshot; etag: string }
 export interface RuntimeReadiness { ready: boolean; experimental: boolean; diagnosticCode: string | null; profileId: string }
 export type TrainingState = 'queued' | 'preparing' | 'training' | 'stop_requested' | 'paused' | 'completed' | 'interrupted' | 'failed';

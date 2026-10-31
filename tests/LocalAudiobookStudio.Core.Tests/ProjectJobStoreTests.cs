@@ -325,12 +325,12 @@ public class ProjectJobStoreTests
     }
     private static long Scalar(ProjectSandbox box, string sql) => (long)VoiceRecordingServiceTests.Sql(box.ProjectRoot, sql)!;
     internal static string Digest(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
-    internal static async Task<ProjectDatabase> Prepared(ProjectSandbox box, bool emptyAppPolicy = false)
+    internal static async Task<ProjectDatabase> Prepared(ProjectSandbox box, bool emptyAppPolicy = false, bool legacyText = false)
     {
         var db = await new ProjectService().CreateAsync(box.ProjectRoot, "Synthetic", Token); var now = DateTimeOffset.UtcNow; var pins = new VersionPins(emptyAppPolicy ? "" : "app-v1", "", "", emptyAppPolicy ? "" : "policy-v1", "frontend-v1", "segmenter-v1");
         string voiceId = Guid.NewGuid().ToString("N"), recordingId = Guid.NewGuid().ToString("N"), chapterId = Guid.NewGuid().ToString("N"); string transcript = "synthetic  \r\n";
         var voice = new VoiceSnapshot(voiceId, $"voice-snapshot/{voiceId}.wav", transcript, new string('A', 64), Digest(transcript).ToUpperInvariant(), new string('B', 64), true, now, 0, 10000);
-        var chapter = new ChapterRecord(chapterId, 1, "Synthetic", "one two", "one two", "one two", now, new(TextSourceKind.Pasted, "Synthetic", "utf-8", Digest("one two"), 7, pins.TextFrontend, pins.Segmenter));
+        var chapter = new ChapterRecord(chapterId, 1, "Synthetic", "one two", "one two", "one two", now, legacyText ? null : new(TextSourceKind.Pasted, "Synthetic", "utf-8", Digest("one two"), 7, pins.TextFrontend, pins.Segmenter));
         var segments = new[] { "one", "two" }.Select((text, i) => new SegmentRecord(Guid.NewGuid().ToString("N"), chapterId, i + 1, text, text, text, Digest(text), "", null, null, 42, pins, db.State.Metadata.Parameters, "queued", false, now, now, null, BoundaryAfter: SegmentBoundary.Sentence)).ToArray();
         await db.SaveAsync(db.State with { Metadata = db.State.Metadata with { Versions = pins }, Voice = voice, VoiceRecording = new(recordingId, $"voice-recording/{recordingId}.wav", new string('C', 64), 960044, 480000, false, true, now), Chapters = [chapter], Segments = segments }, Token); return db;
     }

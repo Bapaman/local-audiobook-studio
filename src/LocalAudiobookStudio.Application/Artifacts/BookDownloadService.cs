@@ -8,11 +8,13 @@ namespace LocalAudiobookStudio.Application.Artifacts;
 
 public sealed class BookDownloadService(IStudioProjectService projects, IProjectArtifactReader artifacts)
 {
-    public async Task<BookReadHandle> OpenAsync(string projectId, long revision, CancellationToken token = default)
+    public Task<BookReadHandle> OpenAsync(string projectId, long revision, CancellationToken token = default)
+        => OpenAsync(projectId,revision,null,token);
+    public async Task<BookReadHandle> OpenAsync(string projectId, long revision, string? textDocumentId, CancellationToken token = default)
     {
         var before = await projects.GetAsync(projectId, token);
         if (revision < 1 || before.Revision != revision) throw new StudioException("project.conflict");
-        var segments = Ordered(before);
+        var segments = Ordered(before,textDocumentId);
         var handles = new List<ArtifactReadHandle>();
         try
         {
@@ -20,7 +22,7 @@ public sealed class BookDownloadService(IStudioProjectService projects, IProject
                 handles.Add(await artifacts.OpenAsync(projectId, segment.OutputArtifactId!, token));
             var assembly = await PcmWavAssembly.CreateAsync(handles.Select(h => h.Content).ToArray(), token);
             var after = await projects.GetAsync(projectId, token);
-            if (after.Revision != revision || !segments.SequenceEqual(Ordered(after))) throw new StudioException("project.conflict");
+            if (after.Revision != revision || !segments.SequenceEqual(Ordered(after,textDocumentId))) throw new StudioException("project.conflict");
             token.ThrowIfCancellationRequested();
             return new(assembly, handles.AsReadOnly());
         }
@@ -35,14 +37,23 @@ public sealed class BookDownloadService(IStudioProjectService projects, IProject
             throw;
         }
     }
-    private static SegmentDto[] Ordered(ProjectSnapshotDto snapshot)
+    private static SegmentDto[] Ordered(ProjectSnapshotDto snapshot, string? textDocumentId)
     {
-        if (snapshot.Segments.Count is < 1 or > 256) throw new StudioException("book.input_limit");
-        if (snapshot.Segments.Any(s => string.IsNullOrWhiteSpace(s.OutputArtifactId))) throw new StudioException("book.incomplete");
-        if (snapshot.Segments.Select(s => s.Order).Distinct().Count() != snapshot.Segments.Count
-            || snapshot.Segments.Select(s => s.Id).Distinct().Count() != snapshot.Segments.Count
-            || snapshot.Segments.Select(s => s.OutputArtifactId).Distinct().Count() != snapshot.Segments.Count) throw new StudioException("book.incomplete");
-        return snapshot.Segments.OrderBy(s => s.Order).ToArray();
+        IReadOnlyList<SegmentDto> segments = snapshot.Segments;
+        if (textDocumentId != null)
+        {
+            if (!Guid.TryParseExact(textDocumentId,"N",out var parsed) || parsed.ToString("N") != textDocumentId) throw new StudioException("text.id.invalid");
+            var document = snapshot.TextDocuments?.FirstOrDefault(d => d.Id == textDocumentId) ?? throw new StudioException("text.document.missing");
+            if (document.SegmentIds.Count != document.SegmentIds.Distinct(StringComparer.Ordinal).Count()) throw new StudioException("book.incomplete");
+            var byId = snapshot.Segments.ToLookup(s => s.Id,StringComparer.Ordinal);
+            segments = document.SegmentIds.Select(id => byId[id].Count() == 1 ? byId[id].Single() : throw new StudioException("book.incomplete")).ToArray();
+        }
+        if (segments.Count is < 1 or > 256) throw new StudioException("book.input_limit");
+        if (segments.Any(s => string.IsNullOrWhiteSpace(s.OutputArtifactId))) throw new StudioException("book.incomplete");
+        if (segments.Select(s => s.Order).Distinct().Count() != segments.Count
+            || segments.Select(s => s.Id).Distinct().Count() != segments.Count
+            || segments.Select(s => s.OutputArtifactId).Distinct().Count() != segments.Count) throw new StudioException("book.incomplete");
+        return segments.OrderBy(s => s.Order).ToArray();
     }
 }
 

@@ -214,7 +214,7 @@ public sealed partial class ProjectDatabase : IAsyncDisposable
         await SaveUnderLeaseAsync(lease, state, cancellationToken);
     }
 
-    internal async Task SaveUnderLeaseAsync(ProjectArtifactLease lease, ProjectState state, CancellationToken cancellationToken)
+    internal async Task SaveUnderLeaseAsync(ProjectArtifactLease lease, ProjectState state, CancellationToken cancellationToken, bool allowTextAppend = false)
     {
         lease.ValidateOwner(this);
         Validate(state);
@@ -227,8 +227,9 @@ public sealed partial class ProjectDatabase : IAsyncDisposable
             var existingRecordings = await ReadAsync<VoiceRecordingSnapshot>("voice_recording", "id", transaction, cancellationToken);
             if (existingRecordings.Count > 0 && existingRecordings[0] != state.VoiceRecording) throw new ProjectException("voice.recording.exists");
             var existingChapters = await ReadAsync<ChapterRecord>("chapters", "ordinal", transaction, cancellationToken);
-            if (existingChapters.Count > 0 && (existingChapters.Count != state.Chapters.Count || existingChapters.Any(existing =>
-                state.Chapters.FirstOrDefault(x => x.Id == existing.Id) is not { } candidate || candidate with { SpokenText = existing.SpokenText } != existing)))
+            if (existingChapters.Count > 0 && ((allowTextAppend ? existingChapters.Count + 1 != state.Chapters.Count : existingChapters.Count != state.Chapters.Count) || existingChapters.Any(existing =>
+                state.Chapters.FirstOrDefault(x => x.Id == existing.Id) is not { } candidate ||
+                (allowTextAppend ? candidate : candidate with { SpokenText = existing.SpokenText }) != existing)))
                 throw new ProjectException("text.exists");
             var existingSegments = await ReadAsync<SegmentRecord>("segments", "ordinal", transaction, cancellationToken);
             var candidateSegments = state.Segments.ToLookup(x => x.Id, StringComparer.Ordinal);

@@ -11,8 +11,8 @@ public static class ArtifactEndpoints
     {
         endpoints.MapGet("/api/projects/{id}/artifacts/{artifactId}", async (HttpContext context, string id, string artifactId, IProjectArtifactReader reader)
             => new OwnedArtifactResult(await reader.OpenAsync(id, artifactId, context.RequestAborted)));
-        endpoints.MapGet("/api/projects/{id}/book.wav", async (HttpContext context, string id, long revision, BookDownloadService books)
-            => new BookResult(await books.OpenAsync(id, revision, context.RequestAborted)));
+        endpoints.MapGet("/api/projects/{id}/book.wav", async (HttpContext context, string id, long revision, string? textDocumentId, BookDownloadService books)
+            => new BookResult(await books.OpenAsync(id, revision, textDocumentId, context.RequestAborted)));
         return endpoints;
     }
 

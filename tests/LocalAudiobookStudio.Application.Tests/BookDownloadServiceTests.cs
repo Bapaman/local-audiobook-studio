@@ -45,6 +45,42 @@ public sealed class BookDownloadServiceTests
         await Assert.ThrowsAsync<StudioException>(() => service.OpenAsync("project",1,TestContext.Current.CancellationToken));
         Assert.Single(reader.Streams); Assert.False(reader.Streams[0].CanRead);
     }
+    private const string FirstText="11111111111111111111111111111111", OtherText="22222222222222222222222222222222";
+    private static ProjectSnapshotDto Multiple(bool otherIncomplete=true) => Snapshot() with {
+        Segments=[..Snapshot().Segments,new("third",3,"three","three","three","hash","draft",otherIncomplete?null:"c")],
+        TextDocuments=[new(FirstText,0,new("Pasted","First","utf-8","hash",3,"one two","one two"),["first","second"]),
+            new(OtherText,1,new("Pasted","Other","utf-8","hash",1,"three","three"),["third"])] };
+    [Fact]
+    public async Task Selected_complete_text_exports_without_audio_from_unfinished_other_text()
+    {
+        var reader=new Reader();var service=new BookDownloadService(new Projects(Multiple(),Multiple()),reader);
+        await using(var book=await service.OpenAsync("project",1,FirstText,TestContext.Current.CancellationToken))
+        {
+            using var output=new MemoryStream();await book.CopyToAsync(output,TestContext.Current.CancellationToken);
+            Assert.Equal(new[]{"a","b"},reader.Opened);Assert.Equal(48,book.Length);
+            Assert.Equal((short)1,BinaryPrimitives.ReadInt16LittleEndian(output.ToArray().AsSpan(44)));
+            Assert.Equal((short)2,BinaryPrimitives.ReadInt16LittleEndian(output.ToArray().AsSpan(46)));
+        }
+        Assert.All(reader.Streams,s=>Assert.False(s.CanRead));
+    }
+    [Theory]
+    [InlineData(OtherText,"book.incomplete")]
+    [InlineData("33333333333333333333333333333333","text.document.missing")]
+    [InlineData("../outside","text.id.invalid")]
+    public async Task Missing_invalid_or_incomplete_scope_never_falls_back_to_other_text(string scope,string code)
+    {
+        var reader=new Reader();var service=new BookDownloadService(new Projects(Multiple()),reader);
+        Assert.Equal(code,(await Assert.ThrowsAsync<StudioException>(()=>service.OpenAsync("project",1,scope,TestContext.Current.CancellationToken))).Code);
+        Assert.Empty(reader.Opened);
+    }
+    [Fact]
+    public async Task Scope_membership_change_during_pin_fails_and_releases_all_audio()
+    {
+        var before=Multiple();var after=before with { TextDocuments=[before.TextDocuments![0] with { SegmentIds=["first"] },before.TextDocuments[1]] };
+        var reader=new Reader();var service=new BookDownloadService(new Projects(before,after),reader);
+        Assert.Equal("project.conflict",(await Assert.ThrowsAsync<StudioException>(()=>service.OpenAsync("project",1,FirstText,TestContext.Current.CancellationToken))).Code);
+        Assert.All(reader.Streams,s=>Assert.False(s.CanRead));
+    }
     private sealed class Projects(params ProjectSnapshotDto[] snapshots) : IStudioProjectService
     {
         private int calls;

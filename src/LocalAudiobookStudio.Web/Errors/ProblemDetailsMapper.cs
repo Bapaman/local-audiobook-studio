@@ -130,14 +130,14 @@ public sealed class ProblemDetailsMapper(RequestDelegate next)
         "book.input_limit" or "book.byte_limit" => (413, code),
         "training.active" or "training.exists" or "training.transition.invalid" or "training.idempotency.conflict" or "training.source.changed" or "training.state.limit" => (409, code),
         "training.busy" => (409, "storage.busy"),
-        "project.unavailable" or "artifact.missing" or "text.segment.missing" or "job.missing" => (404, code),
+        "project.unavailable" or "artifact.missing" or "text.segment.missing" or "text.document.missing" or "job.missing" => (404, code),
         "worker.runtime.not_ready" => (503, code),
-        "voice.recording.too_large" or "text.too_large" => (413, code),
+        "voice.recording.too_large" or "text.too_large" or "text.project_limit" => (413, code),
         "project.idempotency.conflict" or "voice.recording.exists" or "voice.exists" or "text.exists" or "text.reimport_required" or "job.active"
-            or "job.idempotency.conflict" or "job.input_changed" or "job.transition.invalid" => (409, code),
+            or "text.idempotency.conflict" or "job.idempotency.conflict" or "job.input_changed" or "job.transition.invalid" => (409, code),
         "voice.rights" => (403, code),
         "text.encoding.unsupported" => (415, code),
-        "project.id.invalid" or "project.title.invalid" or "project.idempotency.invalid" or "text.display_name.invalid" or "job.input.invalid"
+        "project.id.invalid" or "project.title.invalid" or "project.idempotency.invalid" or "text.display_name.invalid" or "text.id.invalid" or "text.append.invalid" or "job.input.invalid"
             or "text.binary" or "text.empty" or "text.encoding.invalid" or "text.grapheme_boundary" or "text.token_too_long"
             or "wav.empty" or "wav.format" or "wav.samples" or "wav.truncated"
             or "voice.recording.too_short" or "voice.recording.too_long" or "voice.recording.missing"

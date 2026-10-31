@@ -82,6 +82,14 @@ public sealed class StudioJobService(ProjectJobAccess access, IRuntimeDescriptor
     private static async Task<JobSnapshotDto> MapAsync(ProjectDatabase db, JobRecord job, CancellationToken token)
     {
         var snapshot = Map(job);
+        if (db.State.Chapters.Count > 1)
+        {
+            var itemIds = job.Input.Items.Select(i => i.SegmentId).ToHashSet(StringComparer.Ordinal);
+            var sources = db.State.Segments.Where(s => itemIds.Contains(s.Id)).ToArray();
+            var chapterIds = sources.Select(s => s.ChapterId).Distinct(StringComparer.Ordinal).ToArray();
+            if (sources.Length == itemIds.Count && chapterIds.Length == 1)
+                snapshot = snapshot with { TextTitle = db.State.Chapters.FirstOrDefault(c => c.Id == chapterIds[0])?.Title };
+        }
         if (job.CompletedUnits == 0) return snapshot;
         var inputs = job.Input.Items.ToDictionary(x => x.SegmentId, StringComparer.Ordinal);
         var results = (await db.Jobs.ItemsAsync(job.Id, token)).Where(x => x.Artifact != null).OrderBy(x => x.Order).Take(Math.Min(32, job.CompletedUnits))

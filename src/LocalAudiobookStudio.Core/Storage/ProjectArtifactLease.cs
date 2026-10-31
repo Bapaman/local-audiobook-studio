@@ -28,6 +28,9 @@ public sealed class ProjectArtifactLease : IAsyncDisposable
     /// <summary>Reject accepted-input edits while any job is nonterminal; retain this lease through the edit.</summary>
     public Task RequireNoActiveJobsAsync(CancellationToken cancellationToken = default) => project.Jobs.RequireNoActiveJobsAsync(this, cancellationToken);
     public Task SaveAsync(ProjectState state, CancellationToken cancellationToken = default) => project.SaveUnderLeaseAsync(this, state, cancellationToken);
+    /// <summary>Append a separate immutable text while preserving all existing project inputs and history.</summary>
+    public Task AppendTextAsync(long expectedRevision, ChapterRecord chapter, IReadOnlyList<SegmentRecord> segments, CancellationToken cancellationToken = default)
+        => project.AppendTextUnderLeaseAsync(this, expectedRevision, chapter, segments, cancellationToken);
     public Task RegisterPendingArtifactAsync(string part, string? final, CancellationToken cancellationToken = default) => project.RegisterUnderLeaseAsync(this, part, final, cancellationToken);
     public Task RemoveStagingRegistrationAsync(string part, CancellationToken cancellationToken = default) => project.RemoveRegistrationUnderLeaseAsync(this, part, cancellationToken);
     /// <summary>Clean registered, unaccepted leaves only after the caller proves native tree exit.</summary>

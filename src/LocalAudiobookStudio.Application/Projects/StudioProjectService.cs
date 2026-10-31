@@ -262,11 +262,16 @@ public sealed class StudioProjectService(ProjectCatalogOptions options, IProject
     internal static ProjectSnapshotDto Map(ProjectState state, IReadOnlyDictionary<string, string>? outputArtifactIds = null) => new(state.Metadata.Id, state.Metadata.Title, state.Revision,
         state.VoiceRecording is { } recording ? new(recording.Id, recording.Sha256, recording.ByteLength, recording.SampleCount / 48, recording.HasClippingWarning) : null,
         state.Voice is { StartMilliseconds: { } start, EndMilliseconds: { } end } voice ? new(voice.Id, start, end, voice.Transcript) : null,
-        state.Chapters.FirstOrDefault() is { Provenance: { } provenance } chapter ? new(provenance.SourceKind.ToString(), provenance.DisplayName,
-            provenance.SourceEncoding, provenance.SourceHash, provenance.OriginalByteCount, chapter.OriginalText, chapter.NormalizedText) : null,
+        state.Chapters.FirstOrDefault() is { } chapter ? MapDocument(chapter) : null,
         state.Segments.Select(x => new SegmentDto(x.Id, x.Order, x.OriginalText, x.NormalizedText, x.SpokenText, x.TextHash, x.Status,
             outputArtifactIds != null && outputArtifactIds.TryGetValue(x.Id, out var artifactId) ? artifactId : null)).ToArray(),
-        state.Chapters.Count > 0, state.Voice != null);
+        state.Chapters.Count > 0, state.Voice != null,
+        state.Chapters.Count > 1 && state.Chapters.All(c => c.Provenance != null) ? state.Chapters.OrderBy(c => c.Order).Select(c =>
+            new ProjectTextDocumentDto(c.Id,c.Order,MapDocument(c)!,state.Segments.Where(s => s.ChapterId == c.Id).OrderBy(s => s.Order).Select(s => s.Id).ToArray())).ToArray() : null);
+
+    private static TextDocumentDto? MapDocument(ChapterRecord chapter) => chapter.Provenance is { } provenance ?
+        new(provenance.SourceKind.ToString(),provenance.DisplayName,provenance.SourceEncoding,provenance.SourceHash,
+            provenance.OriginalByteCount,chapter.OriginalText,chapter.NormalizedText) : null;
 
     internal async Task<ProjectSnapshotDto> WriteAsync(string projectId, long expectedRevision, Func<ProjectDatabase, CancellationToken, Task> action, CancellationToken token)
     {
