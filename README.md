@@ -80,4 +80,4 @@ docs/      описание проекта
 - [Как подбирать голос и менять настройки генерации](docs/GENERATION.md) — 01.11.2026.
 - [Презентация и материалы выступления](docs/presentation/README.md) — 26.10.2026.
 - [Сравнение моделей и методика оценки](docs/report/audiobook-project.md) · [Word](docs/report/audiobook-project.docx) — 03.11.2026.
-- [Глава 1 и диаграмма вариантов использования](docs/report/chapter-1-voice-data.md) · [Word](docs/report/chapter-1-voice-data.docx) — 09.11.2026.
+- [Краткая глава 1 и области применения](docs/report/chapter-1-voice-data-short.md) · [Word](docs/report/chapter-1-voice-data-short.docx) · [Схема](docs/report/chapter-1-applications.png) — 09.11.2026.
