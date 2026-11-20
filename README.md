@@ -73,11 +73,11 @@ docs/      описание проекта
 
 Подробнее (даты обновления материалов):
 
-- [Цель, работа приложения и ограничения](docs/PROJECT.md) — 29.10.2026.
+- [Цель, работа приложения и ограничения](docs/PROJECT.md) — 17.11.2026.
 - [Запуск на другом компьютере](docs/SETUP.md) — 26.10.2026.
 - [Проверки](docs/TESTING.md) — 26.10.2026.
 - [Внешние компоненты](THIRD_PARTY_NOTICES.md) — 26.10.2026.
 - [Как подбирать голос и менять настройки генерации](docs/GENERATION.md) — 01.11.2026.
 - [Презентация и материалы выступления](docs/presentation/README.md) — 26.10.2026.
-- [Сравнение моделей и методика оценки](docs/report/audiobook-project.md) · [Word](docs/report/audiobook-project.docx) — 03.11.2026.
-- [Краткая глава 1 и области применения](docs/report/chapter-1-voice-data-short.md) · [Word](docs/report/chapter-1-voice-data-short.docx) · [Схема](docs/report/chapter-1-applications.png) — 09.11.2026.
+- [Сравнение моделей и методика оценки](docs/report/audiobook-project.md) — 20.11.2026 ([Word](docs/report/audiobook-project.docx) — 03.11.2026).
+- [Краткая глава 1 и области применения](docs/report/chapter-1-voice-data-short.md) — 20.11.2026 ([Word](docs/report/chapter-1-voice-data-short.docx) и [схема](docs/report/chapter-1-applications.png) — 09.11.2026).
