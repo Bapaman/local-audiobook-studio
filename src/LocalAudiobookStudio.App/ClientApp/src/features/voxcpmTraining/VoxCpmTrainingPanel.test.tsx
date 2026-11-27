@@ -35,26 +35,31 @@ afterEach(() => vi.useRealTimers());
 describe('Resumable VoxCPM2 training', () => {
   it('approved_version_id_and_exact_consent_are_sent', async () => {
     const calls = serve({ [`GET ${read}`]: () => ({ body: null }), [`POST ${read}`]: () => ({ body: { ...saved, state: 'queued', revision: 1, globalStep: 0, models: [] }, etag: '"1"' }) });
-    open(); const button = await screen.findByRole('button', { name: 'Начать проход' }); await waitFor(() => expect(screen.getByLabelText('Версия корпуса для обучения')).toHaveValue('v2'));
+    open(); const button = await screen.findByRole('button', { name: 'Начать проход' }); await waitFor(() => expect(screen.getByLabelText('Подтверждённая запись для обучения')).toHaveValue('v2'));
     expect(button).toBeDisabled(); fireEvent.click(screen.getByRole('checkbox', { name: /понимаю, что качество/ })); fireEvent.click(button);
     await within(panel()).findByText('В очереди'); expect(posts(calls)).toHaveLength(1);
     expect(JSON.parse(posts(calls)[0].init!.body as string)).toEqual({ corpusVersionId: 'v2', experimentalConfirmed: true }); expect(panel()).not.toHaveTextContent('Голос обучен');
   });
   it('saved_steps_and_epochs_are_not_quality_percent', async () => {
     serve(); open(); await within(panel()).findByText(/Принятые шаги: 1/);
-    expect(panel()).toHaveTextContent('Полных проходов: 0'); expect(panel()).toHaveTextContent('Качество голоса ещё не оценивалось'); expect(panel()).not.toHaveTextContent('%');
+    expect(panel()).toHaveTextContent('Полных проходов: 0'); expect(panel()).toHaveTextContent('качество пока не подтверждено'); expect(panel()).not.toHaveTextContent('%');
     expect(within(panel()).getByRole('button', { name: 'Продолжить обучение' })).toBeInTheDocument(); expect(within(panel()).queryByRole('radio')).not.toBeInTheDocument();
   });
-  it('old_models_remain_without_ready_runtime_and_delayed_readiness_does_not_block_history', async () => {
+  it('shows saved models during admission and after an engine error', async () => {
     let resolve!: (value: Reply) => void; const pending = new Promise<Reply>(done => { resolve = done; });
-    serve({ 'GET /api/voxcpm-training/readiness': () => pending }); const view = open();
-    await within(panel()).findByText(/Сохранение.*m1/); expect(screen.getByRole('button', { name: 'Продолжить обучение' })).toBeDisabled();
-    await act(async () => { resolve({ body: { ...ready, ready: false, diagnosticCode: 'voxcpm_training.runtime.not_ready' } }); });
-    expect(panel()).toHaveTextContent(/Сохранение.*m1/); expect(panel()).toHaveTextContent(/не готов/); view.unmount();
+    serve({ [`POST ${read}/${saved.id}/resume`]: () => pending }); const view = open();
+    await within(panel()).findByText(/Сохранение.*m1/);
+    fireEvent.click(screen.getByRole('checkbox', { name: /понимаю, что качество/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Продолжить обучение' }));
+    expect(await screen.findByText(/Проверяем файлы VoxCPM2/)).toBeVisible();
+    await act(async () => { resolve({ status: 503, body: { code: 'voxcpm_training.runtime.not_ready' } }); });
+    expect(panel()).toHaveTextContent(/Сохранение.*m1/);
+    expect(screen.getByRole('alert')).toHaveTextContent(/не готов/);
+    view.unmount();
   });
   it('completed_offers_another_pass_without_promising_quality', async () => {
     serve({ [`GET ${read}`]: () => ({ body: { ...saved, state: 'completed', globalStep: 3, completedEpochs: 1, nextRetainedOrdinal: 0 }, etag: '"3"' }) }); open();
-    expect(await screen.findByRole('button', { name: 'Ещё один проход' })).toBeDisabled(); expect(panel()).toHaveTextContent('Качество голоса ещё не оценивалось');
+    expect(await screen.findByRole('button', { name: 'Ещё один проход' })).toBeDisabled(); expect(panel()).toHaveTextContent('качество пока не подтверждено');
   });
   it('uncertain_command_retries_only_on_user_click_with_same_key_body_etag', async () => {
     let attempts = 0; const calls = serve({ [`GET ${read}`]: () => ({ body: null }), [`POST ${read}`]: () => {
@@ -94,12 +99,18 @@ describe('Resumable VoxCPM2 training', () => {
     const draw = (snapshot: ProjectSnapshot) => <ProjectWorkspacePage current={{ snapshot, etag: '"2"' }} generation={{ jobs: [], readiness: { ready: true, experimental: true, diagnosticCode: null, profileId: 'q8-f16-cpu' }, pending: false, error: '', connected: true, enqueue: async () => {}, control: async () => {} }} segmentRefresh={{}} busy={false} headingRef={null} mutate={async () => {}} onBack={() => {}} />;
     const workspace = render(draw(project));
     await act(async () => {}); expect(screen.getByLabelText('Запись голоса WAV')).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: /экспериментальную подготовку/ })).toBeDisabled(); expect(screen.getByRole('checkbox', { name: /Подтверждаю экспериментальное обучение/ })).toBeDisabled();
+    const trainingTab = screen.getByRole('button', { name: 'Дообучение' });
+    expect(trainingTab).toHaveAccessibleDescription('В работе');
+    fireEvent.click(trainingTab);
     workspace.rerender(draw({ ...project,
       voiceRecording: { artifactId: 'r1', sha256: 'hash', byteLength: 44, durationMilliseconds: 392000, hasClippingWarning: false },
       voiceAnchor: { artifactId: 'a1', startMilliseconds: 0, endMilliseconds: 12000, transcript: 'Образец.' },
       textDocument: { sourceKind: 'Paste', displayName: 'Текст', encoding: 'utf-8', sha256: 'hash', byteCount: 10, originalText: 'Текст.', normalizedText: 'Текст.' },
       segments: [{ id: 's1', order: 0, originalText: 'Текст.', normalizedText: 'Текст.', spokenText: 'Текст.', contentHash: 'hash', status: 'pending' }] }));
+    expect(screen.getByRole('checkbox', { name: /экспериментальную подготовку/ })).toBeDisabled();
+    fireEvent.click(screen.getByText('Прежний способ обучения · RVC'));
+    expect(screen.getByRole('checkbox', { name: /Подтверждаю экспериментальное обучение/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Озвучивание' }));
     expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeDisabled();
     running = false; await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
     expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeEnabled(); workspace.unmount();

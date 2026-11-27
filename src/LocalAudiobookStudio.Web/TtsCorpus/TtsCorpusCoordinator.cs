@@ -6,17 +6,22 @@ namespace LocalAudiobookStudio.Web.TtsCorpus;
 public sealed class TtsCorpusCoordinator(TtsCorpusRunner runner, ITtsCorpusRuntime runtime, TimeProvider time) : BackgroundService
 {
     private readonly CancellationTokenSource idleStop = new();
+    private IReadOnlyList<string> recoveryProjects = [];
+
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        await runner.RecoverAsync(cancellationToken);
+        recoveryProjects = await runner.InterruptOnStartupAsync(cancellationToken);
         await base.StartAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using var idle = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, idleStop.Token);
+        try { await runner.VerifyResumeOnStartupAsync(recoveryProjects, idle.Token); }
+        catch (OperationCanceledException) when (idle.IsCancellationRequested) { return; }
+
         // The default runtime has no configuration; there is nothing to poll.
         if (runtime is UnavailableTtsCorpusRuntime) return;
-        using var idle = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, idleStop.Token);
         while (!idle.IsCancellationRequested)
         {
             try

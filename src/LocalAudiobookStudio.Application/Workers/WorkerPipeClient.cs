@@ -202,6 +202,8 @@ public sealed class WorkerPipeClient : IWorkerClient
             }
         }
         catch (Exception e) when (e is OperationCanceledException && stopped.IsCancellationRequested) { }
+        catch (ProtocolException e) when (e.Code == "protocol.frame.partial" && owner.StopRequested)
+        { await FailAsync("worker.interrupted"); }
         catch (Exception e) { await FailAsync(Map(e)); }
     }
     private async Task CheckHeartbeat()

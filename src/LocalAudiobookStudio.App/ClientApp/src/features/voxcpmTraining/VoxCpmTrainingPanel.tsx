@@ -1,31 +1,27 @@
 import { useEffect, useState } from 'react';
 import { ApiError, type StudioClient } from '../../api/client';
-import type { TtsCorpusVersion, VoxCpmTrainingState, VoxCpmTrainingSnapshot, VoxCpmTrainingReadiness } from '../../api/types';
+import type { TtsCorpusVersion, VoxCpmTrainingState, VoxCpmTrainingSnapshot } from '../../api/types';
 import { useVoxCpmTraining } from './useVoxCpmTraining';
 
 const states: Record<VoxCpmTrainingState, string> = { queued: 'В очереди', loading: 'Загрузка модели', training: 'Обучение на текущем фрагменте', checkpointing: 'Проверка сохранения',
   stop_requested: 'Остановка запрошена', paused: 'Остановлено', completed: 'Заказанный проход завершён', interrupted: 'Прервано при закрытии студии', failed: 'Проход остановлен с ошибкой' };
 const duration = (seconds: number) => `${Math.floor(seconds / 60)} мин ${Math.floor(seconds % 60)} с`;
 export function VoxCpmTrainingPanel({ projectId, projectEtag, versions, externalBusy, onBusyChange, onProjectConflict, onSnapshotChange, client }:
-  { projectId: string; projectEtag: string; versions: TtsCorpusVersion[]; externalBusy: boolean; onBusyChange: (busy: boolean) => void; onProjectConflict: () => void; onSnapshotChange?: (value: VoxCpmTrainingSnapshot | null, readiness: VoxCpmTrainingReadiness | undefined) => void; client?: StudioClient }) {
+  { projectId: string; projectEtag: string; versions: TtsCorpusVersion[]; externalBusy: boolean; onBusyChange: (busy: boolean) => void; onProjectConflict: () => void; onSnapshotChange?: (value: VoxCpmTrainingSnapshot | null) => void; client?: StudioClient }) {
   const state = useVoxCpmTraining(projectId, projectEtag, versions, onProjectConflict, client);
   const [selected, setSelected] = useState(versions.at(-1)?.id ?? ''); const [consent, setConsent] = useState(false);
   useEffect(() => { if (!versions.some(v => v.id === selected)) setSelected(versions.at(-1)?.id ?? ''); }, [versions, selected]);
   useEffect(() => { onBusyChange(state.busy); }, [state.busy, onBusyChange]);
   useEffect(() => () => onBusyChange(false), [onBusyChange]);
-  useEffect(() => { onSnapshotChange?.(state.snapshot, state.readiness); }, [state.snapshot, state.readiness, onSnapshotChange]);
+  useEffect(() => { onSnapshotChange?.(state.snapshot); }, [state.snapshot, onSnapshotChange]);
   const snapshot = state.snapshot;
   const disabled = externalBusy || state.loading || state.pending || state.uncertain || state.active;
-  const canRun = !disabled && state.readiness?.ready === true && consent;
+  const canRun = !disabled && consent;
   const diagnostic = snapshot?.diagnosticCode && /^voxcpm_training\.[a-zA-Z0-9_.]{1,80}$/.test(snapshot.diagnosticCode) ? snapshot.diagnosticCode : null;
-  return <section className="panel training-panel voxcpm-training" aria-labelledby="voxcpm-training-heading">
-    <div className="section-heading"><div><p className="eyebrow">ЛОКАЛЬНОЕ ОБУЧЕНИЕ · ЭКСПЕРИМЕНТ</p><h2 id="voxcpm-training-heading">Дообучение VoxCPM2</h2></div><span className="state-badge">CPU · 2 потока</span></div>
-    <p>Модель проходит по всей подтверждённой записи. После каждого фрагмента сохраняются её изменения и точное место остановки. Продолжение использует это сохранение, а не начинает обучение заново.</p>
-    <p className="subtle">Качество голоса ещё не оценивалось. Завершённый проход — не процент качества. Сохранение можно выбрать в разделе «Озвучивание» и проверить короткой пробой.</p>
-    {!state.readiness ? <p role="status">Проверяем движок обучения… История загружается отдельно.</p>
-      : !state.readiness.ready ? <p className="notice warning">Движок VoxCPM2 не готов. {new ApiError('voxcpm_training.runtime.not_ready').message}</p>
-        : <p className="subtle">Движок проверен. Новое обучение запускается только по вашей команде.</p>}
-    <label htmlFor="vox-corpus-version">Версия корпуса для обучения</label><select id="vox-corpus-version" value={selected} disabled={disabled || versions.length === 0} onChange={event => setSelected(event.target.value)}>
+  return <section className="panel training-panel voxcpm-training" aria-labelledby="voxcpm-training-heading" hidden={!snapshot && !versions.length}>
+    <h2 id="voxcpm-training-heading">Дообучение VoxCPM2</h2>
+    {state.pending && !state.active && <p className="training-check" role="status">Проверяем файлы VoxCPM2 перед запуском. Это может занять пару минут.</p>}
+    <label htmlFor="vox-corpus-version">Подтверждённая запись для обучения</label><select id="vox-corpus-version" value={selected} disabled={disabled || versions.length === 0} onChange={event => setSelected(event.target.value)}>
       {versions.length === 0 && <option value="">Сначала подтвердите корпус речи</option>}
       {versions.map((v, i) => <option key={v.id} value={v.id}>Версия {i + 1} · {v.clipCount} фрагм. · {duration(v.retainedDurationSeconds)}</option>)}
     </select>
@@ -43,7 +39,7 @@ export function VoxCpmTrainingPanel({ projectId, projectEtag, versions, external
           : <div className="generation-actions"><button disabled={!canRun || !snapshot.canResume} onClick={() => void state.resume()}>{snapshot.state === 'completed' ? 'Ещё один проход' : 'Продолжить обучение'}</button>
             <button disabled={!canRun || !selected} onClick={() => void state.start(selected, consent)}>Новая линия обучения</button></div>}
       </article>
-      {snapshot.models.length > 0 && <details className="training-versions" open><summary>Сохранённые модели ({snapshot.models.length})</summary>
+      {snapshot.models.length > 0 && <details className="training-versions workspace-extra"><summary>Сохранённые модели ({snapshot.models.length})</summary>
         <p className="subtle">Старые сохранения остаются в истории и доступны в выборе голоса. Перед озвучиванием студия проверит запись и выбранную модель.</p>
         <ol className="vox-model-history" tabIndex={0} aria-label="История сохранений VoxCPM2">{snapshot.models.map(m => <li key={m.id}>Сохранение {m.id.slice(0, 8)} · шаг {m.globalStep} · проходов {m.completedEpochs}<p className="subtle">Линия {m.trainingId.slice(0, 8)} · <time dateTime={m.createdUtc}>{new Date(m.createdUtc).toLocaleString('ru-RU')}</time></p></li>)}</ol>
       </details>}

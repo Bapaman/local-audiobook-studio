@@ -26,11 +26,13 @@ public sealed class VoxCpmGenerationEndpointTests
         public Task<VoxCpmInferenceIdentity> GetIdentityAsync(CancellationToken token) => throw new InvalidOperationException("Readiness must not admit identity");
     }
 
-    [Fact]
-    public async Task Catalog_is_model_bound_and_does_not_admit_inference_runtime()
+    [Theory]
+    [InlineData(5)]
+    [InlineData(10)]
+    public async Task Catalog_is_model_bound_and_does_not_admit_inference_runtime(int recordingSeconds)
     {
         await using var host = await VoxCpmTrainingApiFixture.HostAsync();
-        var project = await VoxCpmTrainingApiFixture.ApprovedAsync(host);
+        var project = await VoxCpmTrainingApiFixture.ApprovedAsync(host, recordingSeconds * 48000);
         var training = host.Services.GetRequiredService<IStudioVoxCpmTrainingService>();
         await training.StartAsync(project.Id, long.Parse(project.ETag.Trim('"')), "train-reference", project.VersionId, true, ApiTestHost.Token);
         Assert.True(await host.Services.GetRequiredService<VoxCpmTrainingRunner>().RunNextAsync(ApiTestHost.Token));
@@ -41,7 +43,7 @@ public sealed class VoxCpmGenerationEndpointTests
         var json = await ApiTestHost.JsonAsync(response); Assert.Equal(model.Id, json.GetProperty("modelId").GetString());
         Assert.Equal(project.VersionId, json.GetProperty("corpusVersionId").GetString());
         var clip = Assert.Single(json.GetProperty("clips").EnumerateArray());
-        Assert.Equal(10, clip.GetProperty("seconds").GetDouble());
+        Assert.Equal(recordingSeconds, clip.GetProperty("seconds").GetDouble());
         Assert.Equal(clip.GetProperty("id").GetString(), json.GetProperty("defaultClipId").GetString());
         Assert.DoesNotContain(host.Root, json.ToString());
         using var request = host.Request(HttpMethod.Get, $"/api/projects/{project.Id}/voxcpm-generation/models/{model.Id}/references/{clip.GetProperty("id").GetString()}/audio");

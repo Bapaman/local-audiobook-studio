@@ -1,4 +1,3 @@
-using LocalAudiobookStudio.Core.Voices;
 using LocalAudiobookStudio.Core.Projects;
 using LocalAudiobookStudio.Web.Hosting;
 using LocalAudiobookStudio.Web.Lifetime;
@@ -26,7 +25,6 @@ try
     }
     await using var app = LocalWebHost.Build(new(root, WebRoot: args[0]), services =>
     {
-        services.AddSingleton(new VoiceRecordingPolicy(48000, 57600000));
         services.AddSingleton<IAppLifetimeControl, BrowserExit>();
         if (args.Length == 2 && args[1] == "--generation") SyntheticGeneration.Add(services);
     });

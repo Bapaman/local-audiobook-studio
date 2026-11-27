@@ -92,7 +92,8 @@ public sealed partial class ProjectDatabase
                 JobValidation.Require(IsProvenAbsent(claim.FinalRelativePath + ".part"), "worker.output.invalid");
                 GenerationPathPins.Check(file);
                 DateTimeOffset now = DateTimeOffset.UtcNow;
-                segment = segment with { Status = "done", OutputRelativePath = result.RelativePath, OutputHash = result.Sha256, UpdatedUtc = now, DiagnosticCode = null };
+                segment = segment with { Status = "done", OutputRelativePath = result.RelativePath, OutputHash = result.Sha256,
+                    ReviewedArtifactId = null, UpdatedUtc = now, DiagnosticCode = null };
                 attempt = attempt with { Status = "done", OutputHash = result.Sha256, CompletedUtc = now, DiagnosticCode = null };
                 await UpdateSegmentAsync(transaction, segment, token); await UpdateAttemptAsync(transaction, attempt, token);
                 await WriteItemAsync(transaction, item with { State = JobState.Completed, Artifact = result }, token);

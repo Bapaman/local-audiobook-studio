@@ -19,10 +19,10 @@ internal static class TtsCorpusApiFixture
             if (!hosted) services.RemoveAll<IHostedService>();
         });
 
-    internal static async Task<(string Id, string ETag)> ProjectAsync(ApiTestHost host)
+    internal static async Task<(string Id, string ETag)> ProjectAsync(ApiTestHost host, int sourceSamples = 480000)
     {
         var project = await host.CreateAsync();
-        using var upload = await host.SendAsync(HttpMethod.Post, $"/api/projects/{project.Id}/voice/recording", ApiTestHost.Multipart(ApiTestHost.Wav()), project.ETag);
+        using var upload = await host.SendAsync(HttpMethod.Post, $"/api/projects/{project.Id}/voice/recording", ApiTestHost.Multipart(ApiTestHost.Wav(sourceSamples)), project.ETag);
         Assert.Equal(System.Net.HttpStatusCode.OK, upload.StatusCode);
         return (project.Id, upload.Headers.ETag!.Tag);
     }
@@ -45,10 +45,15 @@ internal static class TtsCorpusApiFixture
         public bool Ready { get; set; } = true;
         public string Fingerprint { get; set; } = new('a', 64);
         public string? ErrorCode { get; set; }
+        public Func<CancellationToken, Task>? BeforeFingerprint { get; init; }
         public Task<TtsCorpusReadinessDto> GetReadinessAsync(CancellationToken token = default)
             => ErrorCode == null ? Task.FromResult(new TtsCorpusReadinessDto(Ready, Ready ? null : "tts_corpus.runtime.not_ready"))
                 : Task.FromException<TtsCorpusReadinessDto>(new LocalAudiobookStudio.Application.Errors.StudioException(ErrorCode));
-        public Task<string> GetFingerprintAsync(CancellationToken token = default) => Task.FromResult(Fingerprint);
+        public async Task<string> GetFingerprintAsync(CancellationToken token = default)
+        {
+            if (BeforeFingerprint != null) await BeforeFingerprint(token);
+            return Ready && ErrorCode == null ? Fingerprint : throw new TtsCorpusExecutionException(ErrorCode ?? "tts_corpus.runtime.not_ready");
+        }
     }
 
     internal sealed class Executor : ITtsCorpusExecutor

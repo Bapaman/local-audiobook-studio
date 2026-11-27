@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using LocalAudiobookStudio.Core.Projects;
 using LocalAudiobookStudio.Core.Text;
 using LocalAudiobookStudio.Core.Jobs;
+using LocalAudiobookStudio.Core.Voices;
 
 namespace LocalAudiobookStudio.Core.Storage;
 
@@ -480,8 +481,8 @@ public sealed partial class ProjectDatabase : IAsyncDisposable
         }
         if (state.Voice is { } voice && (voice.StartMilliseconds.HasValue || voice.EndMilliseconds.HasValue))
         {
-            if (state.VoiceRecording == null || voice.StartMilliseconds is not { } start || voice.EndMilliseconds is not { } end || start < 0 ||
-                end <= start || end - start is < 10000 or > 20000 || end > state.VoiceRecording.SampleCount / 48)
+            if (state.VoiceRecording == null || voice.StartMilliseconds is not { } start || voice.EndMilliseconds is not { } end ||
+                !VoiceRecordingPolicy.IsAnchorRangeValid(state.VoiceRecording.SampleCount, start, end))
                 throw new ProjectException("project.schema.invalid");
         }
         foreach (var chapter in state.Chapters)
@@ -526,8 +527,8 @@ public sealed partial class ProjectDatabase : IAsyncDisposable
     public Task<ProjectReadSnapshot> ReadCurrentSnapshotAsync(CancellationToken token = default) => JobTransactionAsync(false, async (db, transaction) =>
     {
         var state = await ReadJobProjectAsync(transaction, token);
-        var ids = await Jobs.ReadCurrentOutputArtifactIdsAsync(db, transaction, state, token);
-        return new ProjectReadSnapshot(state, ids, await Jobs.HasActiveJobAsync(db, transaction, token));
+        var outputs = await Jobs.ReadOutputArtifactsAsync(db, transaction, state, token);
+        return new ProjectReadSnapshot(state, outputs.Current, await Jobs.HasActiveJobAsync(db, transaction, token), outputs.Previous);
     }, token);
 
     internal async Task<ProjectState> ReadJobProjectAsync(SqliteTransaction transaction, CancellationToken token)

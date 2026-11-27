@@ -13,6 +13,12 @@ public static class ArtifactEndpoints
             => new OwnedArtifactResult(await reader.OpenAsync(id, artifactId, context.RequestAborted)));
         endpoints.MapGet("/api/projects/{id}/book.wav", async (HttpContext context, string id, long revision, string? textDocumentId, BookDownloadService books)
             => new BookResult(await books.OpenAsync(id, revision, textDocumentId, context.RequestAborted)));
+        endpoints.MapGet("/api/projects/{id}/chapters.zip", async (HttpContext context, string id, long revision, string? textDocumentId, ChapterArchiveDownloadService archives) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            var archive = await archives.OpenAsync(id, revision, textDocumentId, context.RequestAborted);
+            return Results.File(archive, "application/zip", "chapters.zip");
+        });
         return endpoints;
     }
 

@@ -408,7 +408,7 @@ public sealed class ProjectCatalogTests
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Task.Run(() =>
             {
                 object paths = CatalogPathsOf(sandbox.Catalog());
-                try { using var snapshot = (IDisposable)type.GetMethod("Create")!.Invoke(null, [paths, db, canceled.Token])!; }
+                try { using var snapshot = (IDisposable)type.GetMethod("Create")!.Invoke(null, [paths, db, canceled.Token, false])!; }
                 catch (System.Reflection.TargetInvocationException error) when (error.InnerException is OperationCanceledException canceledError)
                 { throw canceledError; }
             }, Token));

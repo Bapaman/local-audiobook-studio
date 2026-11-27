@@ -1,4 +1,5 @@
 using LocalAudiobookStudio.Core.Projects;
+using LocalAudiobookStudio.Core.Text;
 
 namespace LocalAudiobookStudio.Core.Storage;
 
@@ -19,8 +20,8 @@ public sealed partial class ProjectDatabase
             provenance.SegmenterVersion != state.Metadata.Versions.Segmenter || segments == null ||
             segments.Any(s => s?.Versions != state.Metadata.Versions))
             throw new ProjectException("text.reimport_required");
-        if (state.Chapters.Count >= 32 || segments.Count > 10000 - state.Segments.Count ||
-            state.Chapters.Sum(c => (long)c.OriginalText.Length) + chapter.OriginalText.Length > 8_000_000)
+        if (state.Chapters.Count >= TextImportService.MaximumProjectTexts || segments.Count > TextImportService.MaximumProjectSegments - state.Segments.Count ||
+            state.Chapters.Sum(c => (long)c.OriginalText.Length) + chapter.OriginalText.Length > TextImportService.MaximumPastedCodeUnits)
             throw new ProjectException("text.project_limit");
 
         var oldIds = state.Segments.Select(s => s.Id).ToHashSet(StringComparer.Ordinal);

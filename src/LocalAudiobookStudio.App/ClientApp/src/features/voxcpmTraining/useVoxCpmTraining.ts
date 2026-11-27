@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, StudioClient } from '../../api/client';
-import type { TtsCorpusVersion, VoxCpmTrainingReadiness, VoxCpmTrainingResponse } from '../../api/types';
+import type { TtsCorpusVersion, VoxCpmTrainingResponse } from '../../api/types';
 
 const active = (value: VoxCpmTrainingResponse | null) => !!value && ['queued', 'loading', 'training', 'checkpointing', 'stop_requested'].includes(value.snapshot.state);
 type Intent = { key: string; expectedId?: string; send: (key: string, signal: AbortSignal) => Promise<VoxCpmTrainingResponse> };
@@ -10,7 +10,6 @@ export function useVoxCpmTraining(projectId: string, projectEtag: string, versio
   const [client] = useState(() => sharedClient ?? new StudioClient());
   const scope = useRef<Scope | undefined>(undefined);
   const [value, setValue] = useState<VoxCpmTrainingResponse | null>(null);
-  const [readiness, setReadiness] = useState<VoxCpmTrainingReadiness>();
   const [loading, setLoading] = useState(true), [pending, setPending] = useState(false), [uncertain, setUncertain] = useState(false);
   const [readError, setReadError] = useState(''), [commandError, setCommandError] = useState('');
   const owns = (owner: Scope) => owner.alive && scope.current === owner;
@@ -23,24 +22,14 @@ export function useVoxCpmTraining(projectId: string, projectEtag: string, versio
   }
   useEffect(() => {
     const owner: Scope = { id: projectId, alive: true, abort: new AbortController(), epoch: 0, value: null, pending: false };
-    scope.current = owner; setValue(null); setReadiness(undefined); setLoading(true); setPending(false); setUncertain(false); setReadError(''); setCommandError('');
-    let timer: ReturnType<typeof setTimeout> | undefined, reading = false, checking = false;
+    scope.current = owner; setValue(null); setLoading(true); setPending(false); setUncertain(false); setReadError(''); setCommandError('');
+    let timer: ReturnType<typeof setTimeout> | undefined, reading = false;
     const schedule = (delay: number) => { clearTimeout(timer); timer = setTimeout(() => void refresh(), delay); };
     owner.pollSoon = () => { if (owns(owner)) schedule(2000); };
-    async function checkReadiness() {
-      if (!owns(owner) || checking) return; checking = true;
-      try {
-        const next = await client.voxCpmTrainingReadiness(owner.abort.signal);
-        if (owns(owner)) setReadiness({ ...next, ready: next.ready === true && next.diagnosticCode === null && next.cpuThreads === 2 && next.provider === 'voxcpm2-lora-cpu-v1' });
-      } catch {
-        if (owns(owner)) setReadiness({ ready: false, diagnosticCode: 'voxcpm_training.runtime.not_ready', provider: 'voxcpm2-lora-cpu-v1', cpuThreads: 2 });
-      } finally { checking = false; }
-    }
     async function refresh() {
       if (!owns(owner) || reading) return; reading = true; const epoch = owner.epoch;
       try {
         await client.bootstrap(); if (!owns(owner)) return;
-        void checkReadiness(); // A slow readiness hash must not hide saved history.
         const next = await client.voxCpmTraining(owner.id, owner.abort.signal);
         if (owns(owner) && epoch === owner.epoch && !owner.pending) { install(owner, next); setReadError(''); }
       } catch (error) { if (owns(owner) && epoch === owner.epoch) setReadError(error instanceof ApiError ? error.message : new ApiError('network').message); }
@@ -74,8 +63,7 @@ export function useVoxCpmTraining(projectId: string, projectEtag: string, versio
     }
   }
   const current = value?.snapshot.projectId === projectId ? value : null;
-  const inScope = scope.current?.id === projectId;
-  return { snapshot: current?.snapshot ?? null, etag: current?.etag, readiness: inScope ? readiness : undefined,
+  return { snapshot: current?.snapshot ?? null, etag: current?.etag,
     loading, pending, uncertain, active: active(current), busy: active(current) || pending || uncertain, error: commandError || readError,
     start: (versionId: string, consent: boolean) => consent === true && versions.some(v => v.id === versionId)
       ? issue({ key: crypto.randomUUID(), send: (key, signal) => client.startVoxCpmTraining(projectId, projectEtag, versionId, consent, key, signal) }) : Promise.resolve(),

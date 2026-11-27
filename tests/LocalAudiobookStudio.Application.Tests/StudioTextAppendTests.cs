@@ -78,6 +78,29 @@ public sealed class StudioTextAppendTests
         Assert.Equal(2,(await box.Service().GetAsync(first.Id,Token)).TextDocuments!.Count);
     }
     [Fact]
+    public async Task One_job_can_capture_fragments_in_book_order_across_texts()
+    {
+        using var box = new CatalogSandbox();
+        var first = await First(box);
+        var voices = new StudioVoiceService(box.Service(), new VoiceRecordingService(new(48000)));
+        var recording = await voices.UploadRecordingAsync(first.Id, first.Revision, new("synthetic.wav", true),
+            new MemoryStream(TtsCorpusServiceTests.Wav(48000, 576000)), Token);
+        var anchor = await voices.ConfirmAnchorAsync(first.Id, recording.Revision, new(0, 10000, "Синтетический образец голоса.", true), Token);
+        var book = await new StudioTextService(box.Service()).AppendPastedAsync(first.Id, anchor.Revision,
+            new("Вторая книга", "Следующая история.", Guid.NewGuid().ToString("N")), Token);
+        var orderedIds = book.TextDocuments!.SelectMany(text => text.SegmentIds).ToArray();
+        var jobs = StudioJobServiceTests.Service(box, new StudioJobServiceTests.Runtime());
+        var queued = await jobs.EnqueueAsync(first.Id, book.Revision, "whole-book",
+            new(JobKind.Generation, orderedIds.Reverse().ToArray()), Token);
+
+        var wire = JsonSerializer.SerializeToElement(await jobs.GetAsync(first.Id, queued.Id, Token), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Equal(2, wire.GetProperty("textCount").GetInt32());
+        Assert.False(wire.TryGetProperty("textTitle", out _));
+        Assert.Equal(orderedIds.Length, queued.TotalUnits);
+        await using var db = await new ProjectService().OpenAsync(box.ProjectRoot(first.Id), Token);
+        Assert.Equal(orderedIds, (await db.Jobs.GetAsync(queued.Id, Token)).Input.Items.Select(item => item.SegmentId));
+    }
+    [Fact]
     public async Task Paused_trained_voice_remains_usable_for_new_text_without_retraining_or_touching_protected_audio()
     {
         using var f=new VoxCpmTrainingFixture();await f.SeedAsync(Token);await f.StartAsync(Token);

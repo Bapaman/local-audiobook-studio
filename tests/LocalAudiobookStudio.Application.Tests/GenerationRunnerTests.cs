@@ -49,6 +49,24 @@ public class GenerationRunnerTests
     }
 
     [Fact]
+    public async Task Decode_limit_failure_is_saved_without_publishing_an_artifact()
+    {
+        await using var fixture = await Fixture.Create(preview: true);
+        fixture.Workers.HitDecodeLimit = true;
+        fixture.Workers.Release.TrySetResult();
+
+        Assert.True(await fixture.Runner.RunNextAsync(Token));
+        var job = await fixture.Job();
+        Assert.Equal(JobState.Failed, job.State);
+        Assert.Equal("worker.output.limit", job.DiagnosticCode);
+        Assert.Equal(0, job.CompletedUnits);
+
+        await using var db = await fixture.Open();
+        Assert.Null(Assert.Single(await db.Jobs.ItemsAsync(job.Id, Token)).Artifact);
+        Assert.Contains(await db.Jobs.ReadEventsAsync(0, Token), recorded => recorded.DiagnosticCode == "worker.output.limit");
+    }
+
+    [Fact]
     public async Task Pause_accepts_current_and_starts_no_next_and_uses_actual_sample_count()
     {
         await using var fixture = await Fixture.Create();
@@ -377,6 +395,7 @@ public class GenerationRunnerTests
         public bool WritePendingAtStart { get; set; }
         public bool HoldCleanup { get; set; }
         public bool ErrorAfterConfirmedCleanup { get; set; }
+        public bool HitDecodeLimit { get; set; }
         public bool BadOutputHash { get; set; }
         public bool TamperOutputDuringCleanup { get; set; }
         public SynthesizeSegmentCommand? LastCommand { get; private set; }
@@ -393,6 +412,7 @@ public class GenerationRunnerTests
                 using var canceled = token.Register(() => factory.CancelSeen.TrySetResult());
                 if (factory.WritePendingAtStart) await File.WriteAllBytesAsync(command.FinalPath + ".part", [1, 2, 3], CancellationToken.None);
                 factory.Started.TrySetResult(); await factory.Release.Task;
+                if (factory.HitDecodeLimit) throw new WorkerClientException("worker.output.limit", true);
                 if (factory.OomEveryAttempt || factory.OomFirst && factory.Profiles.Count == 1) throw new WorkerClientException("worker.cuda.oom", true);
                 byte[] content = Wave(4800); await File.WriteAllBytesAsync(command.FinalPath + ".part", content, CancellationToken.None);
                 File.Move(command.FinalPath + ".part", command.FinalPath);

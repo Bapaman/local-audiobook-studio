@@ -9,6 +9,37 @@ namespace LocalAudiobookStudio.WorkerHost.Tests;
 public class ArtifactResolverTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task Fixture_cleanup_waits_for_a_temporary_lock_on_its_copied_executable()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var fixture = new Artifacts();
+        fixture.UseFakeExecutable();
+        string executable = Path.Combine(fixture.Runtime, "bin", "voxcpm2-cli.exe");
+        using var locked = new FileStream(executable, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var disposing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cleanup = Task.Run(() =>
+        {
+            disposing.SetResult();
+            fixture.Dispose();
+        }, Token);
+        try
+        {
+            try
+            {
+                await disposing.Task.WaitAsync(Token);
+                await Task.Delay(TimeSpan.FromMilliseconds(150), Token);
+            }
+            finally { locked.Dispose(); await cleanup; }
+            Assert.False(Directory.Exists(fixture.Root));
+        }
+        finally
+        {
+            if (Directory.Exists(fixture.Root)) fixture.Dispose();
+        }
+    }
+
     [Fact]
     public async Task Verified_developer_artifacts_ignore_manifest_absolute_paths_and_hold_selected_bytes()
     {
@@ -75,6 +106,7 @@ public class ArtifactResolverTests
     }
     internal sealed class Artifacts : IDisposable
     {
+        private string? copiedExecutable;
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "las-worker-" + Guid.NewGuid().ToString("N"));
         public string Runtime => Path.Combine(Root, "runtime"); public string Model => Path.Combine(Root, "model");
         public string Locks => Path.Combine(Root, "locks");
@@ -120,7 +152,9 @@ public class ArtifactResolverTests
         {
             string source = Path.GetDirectoryName(NativeLauncherTests.FakeExecutable)!;
             foreach (string name in new[] { "llama.dll", "llama.runtimeconfig.json", "llama.deps.json" }) File.Copy(Path.Combine(source, name), Path.Combine(Runtime, "bin", name), true);
-            File.Copy(NativeLauncherTests.FakeExecutable, Path.Combine(Runtime, "bin", "voxcpm2-cli.exe"), true);
+            string executable = Path.Combine(Runtime, "bin", "voxcpm2-cli.exe");
+            File.Copy(NativeLauncherTests.FakeExecutable, executable, true);
+            copiedExecutable = executable;
             foreach (var record in Worker["files"]!.AsArray())
             {
                 string name = record!["name"]!.GetValue<string>(); byte[] bytes = File.ReadAllBytes(Path.Combine(Runtime, "bin", name));
@@ -129,6 +163,22 @@ public class ArtifactResolverTests
             WriteManifests();
         }
         public ArtifactResolver Resolver(bool developer = true) => new(Runtime, Model, Locks, developer);
-        public void Dispose() => Directory.Delete(Root, true);
+        public void Dispose()
+        {
+            if (OperatingSystem.IsWindows() && copiedExecutable is not null)
+            {
+                // Windows can briefly refuse deletion of the test copy after the
+                // worker assertions have confirmed shutdown. Leave other cleanup
+                // failures and persistent locks visible to the test runner.
+                for (int retry = 0; ; retry++)
+                {
+                    try { File.Delete(copiedExecutable); break; }
+                    catch (Exception error) when (retry < 20
+                        && error.HResult is unchecked((int)0x80070005) or unchecked((int)0x80070020))
+                    { Thread.Sleep(25); }
+                }
+            }
+            Directory.Delete(Root, true);
+        }
     }
 }

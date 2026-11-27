@@ -30,7 +30,7 @@ internal sealed class VoxCpmTrainingNativeExecutor(VoxCpmTrainingRuntime runtime
             lease = await runtime.AcquireAsync(token);
             if (lease.Identity != execution.Identity) throw new VoxCpmTrainingExecutionException("voxcpm_training.runtime.changed");
             cache = await VoxCpmTrainingCacheLease.AcquireAsync(runtime.Options.CachePath, lease.CacheBytes, lease.Identity.CacheSha256, token);
-            pins = new VoxCpmTrainingFilePins();
+            pins = new VoxCpmTrainingFilePins(VoxCpmTrainingFilePins.Resolve(execution.ProjectRoot, "voxcpm-training"));
             var invocation = VoxCpmTrainingProtocol.Create(execution, runtime.Options, lease);
             var source = execution.Corpus.Source;
             var sourceFile = await pins.ReadAsync(VoxCpmTrainingFilePins.Resolve(execution.ProjectRoot, source.WavRelativePath), source.ByteLength, source.Sha256.ToLowerInvariant(), token);

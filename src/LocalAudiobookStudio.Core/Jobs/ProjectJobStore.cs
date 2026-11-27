@@ -80,41 +80,57 @@ public sealed class ProjectJobStore
     public Task<AcceptedJobArtifact?> FindAcceptedArtifactAsync(string artifactId, CancellationToken token) => project.JobTransactionAsync<AcceptedJobArtifact?>(false, async (connection, transaction) =>
     {
         if (!JobValidation.Id(artifactId) || !await HasSchemaAsync(connection, transaction, token)) return null;
-        return (await AcceptedItemsAsync(connection, transaction, token)).SingleOrDefault(x => x.Artifact!.Id == artifactId)?.Artifact;
+        return (await AcceptedItemsAsync(connection, transaction, token)).SingleOrDefault(x => x.Artifact.Id == artifactId)?.Artifact;
     }, token);
 
     /// <summary>Opaque IDs for current committed segment outputs, never a guessed path or an unaccepted attempt.</summary>
     public Task<IReadOnlyDictionary<string, string>> ReadCurrentOutputArtifactIdsAsync(CancellationToken token) => project.JobTransactionAsync<IReadOnlyDictionary<string, string>>(false, async (connection, transaction) =>
     {
         var state = await project.ReadJobProjectAsync(transaction, token);
-        return await ReadCurrentOutputArtifactIdsAsync(connection, transaction, state, token);
+        return (await ReadOutputArtifactsAsync(connection, transaction, state, token)).Current;
     }, token);
 
-    internal async Task<IReadOnlyDictionary<string, string>> ReadCurrentOutputArtifactIdsAsync(SqliteConnection connection, SqliteTransaction transaction, ProjectState state, CancellationToken token)
+    internal async Task<(IReadOnlyDictionary<string, string> Current, IReadOnlyDictionary<string, PreviousSegmentAudio> Previous)> ReadOutputArtifactsAsync(
+        SqliteConnection connection, SqliteTransaction transaction, ProjectState state, CancellationToken token)
     {
-        var result = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (!await HasSchemaAsync(connection, transaction, token)) return result;
-        var accepted = await AcceptedItemsAsync(connection, transaction, token);
-        foreach (var segment in state.Segments)
+        var current = new Dictionary<string, string>(StringComparer.Ordinal);
+        var previous = new Dictionary<string, PreviousSegmentAudio>(StringComparer.Ordinal);
+        if (await HasSchemaAsync(connection, transaction, token))
         {
-            var item = accepted.SingleOrDefault(x => x.SegmentId == segment.Id && x.Artifact!.RelativePath == segment.OutputRelativePath && x.Artifact.Sha256 == segment.OutputHash);
-            if (item != null) result.Add(segment.Id, item.Artifact!.Id);
+            var bySegment = (await AcceptedItemsAsync(connection, transaction, token)).ToLookup(item => item.SegmentId, StringComparer.Ordinal);
+            foreach (var segment in state.Segments)
+            {
+                var versions = bySegment[segment.Id];
+                var live = versions.SingleOrDefault(item => item.Artifact.RelativePath == segment.OutputRelativePath && item.Artifact.Sha256 == segment.OutputHash);
+                if (live != null) current.Add(segment.Id, live.Artifact.Id);
+
+                // Jobs are read in reverse enqueue order, including those outside the history window.
+                var earlier = versions.FirstOrDefault(item => item.Artifact.Id != live?.Artifact.Id);
+                if (earlier != null) previous.Add(segment.Id, new(earlier.Artifact.Id, earlier.SpokenText));
+            }
         }
-        return new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(result);
+        return (new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(current),
+            new System.Collections.ObjectModel.ReadOnlyDictionary<string, PreviousSegmentAudio>(previous));
     }
 
-    private async Task<IReadOnlyList<JobItemRecord>> AcceptedItemsAsync(SqliteConnection connection, SqliteTransaction transaction, CancellationToken token)
+    private sealed record AcceptedItem(string SegmentId, AcceptedJobArtifact Artifact, string SpokenText);
+
+    private async Task<IReadOnlyList<AcceptedItem>> AcceptedItemsAsync(SqliteConnection connection, SqliteTransaction transaction, CancellationToken token)
     {
-        var result = new List<JobItemRecord>(); var ids = new HashSet<string>(StringComparer.Ordinal); var paths = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<AcceptedItem>(); var ids = new HashSet<string>(StringComparer.Ordinal); var paths = new HashSet<string>(StringComparer.Ordinal);
         var state = await project.ReadJobProjectAsync(transaction, token);
         if (state.Voice is { } voice) JobValidation.Require(ids.Add(voice.Id));
         if (state.VoiceRecording is { } recording) JobValidation.Require(ids.Add(recording.Id));
         foreach (var job in await JobsAsync(connection, transaction, false, token))
-        foreach (var item in await ItemsAsync(connection, transaction, job, token))
         {
-            if (item.Artifact is not { } artifact) continue;
-            JobValidation.Require(ids.Add(artifact.Id) && paths.Add(artifact.RelativePath) && artifact.RelativePath == $"segments/{job.Id}/{item.AttemptId}.wav");
-            result.Add(item);
+            var items = await ItemsAsync(connection, transaction, job, token);
+            for (int index = 0; index < items.Count; index++)
+            {
+                var item = items[index];
+                if (item.Artifact is not { } artifact) continue;
+                JobValidation.Require(ids.Add(artifact.Id) && paths.Add(artifact.RelativePath) && artifact.RelativePath == $"segments/{job.Id}/{item.AttemptId}.wav");
+                result.Add(new(item.SegmentId, artifact, job.Input.Items[index].SpokenText));
+            }
         }
         return result.AsReadOnly();
     }

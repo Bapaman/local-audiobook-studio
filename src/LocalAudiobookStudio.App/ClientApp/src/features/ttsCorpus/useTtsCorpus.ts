@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, StudioClient } from '../../api/client';
-import type { SnapshotResponse, TtsCorpusClipUpdate, TtsCorpusReadiness, TtsCorpusResponse } from '../../api/types';
+import type { SnapshotResponse, TtsCorpusClipUpdate, TtsCorpusResponse } from '../../api/types';
 
 export const corpusActive = (value: TtsCorpusResponse | null) => !!value && ['queued', 'preparing', 'transcribing', 'stop_requested'].includes(value.snapshot.state);
+export const corpusCheckingResume = (value: TtsCorpusResponse | null) => value?.snapshot.diagnosticCode === 'tts_corpus.interrupted.checking';
 type Send = (key: string, signal: AbortSignal) => Promise<TtsCorpusResponse>;
 type Scope = { id: string; active: boolean; abort: AbortController; value: TtsCorpusResponse | null; pending: boolean; epoch: number; pollSoon?: () => void; retry?: { signature: string; key: string; send: Send } };
 
@@ -11,7 +12,6 @@ export function useTtsCorpus(current: SnapshotResponse, sharedClient?: StudioCli
   const client = sharedClient ?? ownedClient;
   const scope = useRef<Scope | undefined>(undefined);
   const [corpus, setCorpus] = useState<TtsCorpusResponse | null>(null);
-  const [readiness, setReadiness] = useState<TtsCorpusReadiness>();
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [readError, setReadError] = useState('');
@@ -25,22 +25,11 @@ export function useTtsCorpus(current: SnapshotResponse, sharedClient?: StudioCli
   useEffect(() => {
     const owner: Scope = { id: current.snapshot.id, active: true, abort: new AbortController(), value: null, pending: false, epoch: 0 };
     scope.current = owner;
-    setCorpus(null); setReadiness(undefined); setLoading(true); setPending(false); setReadError(''); setMutationError('');
+    setCorpus(null); setLoading(true); setPending(false); setReadError(''); setMutationError('');
     let timer: ReturnType<typeof setTimeout> | undefined;
     let reading = false;
-    let checkingReadiness = false;
     function schedule(delay: number) { clearTimeout(timer); timer = setTimeout(() => void refresh(), delay); }
     owner.pollSoon = () => { if (owner.active) schedule(2000); };
-    async function refreshReadiness() {
-      if (!owner.active || checkingReadiness) return;
-      checkingReadiness = true;
-      try {
-        const runtime = await client.ttsCorpusReadiness(owner.abort.signal);
-        if (owner.active && scope.current === owner) setReadiness({ ...runtime, ready: runtime.ready === true && runtime.diagnosticCode === null && runtime.cpuThreads === 2 });
-      } catch {
-        if (owner.active && scope.current === owner) setReadiness({ ready: false, diagnosticCode: 'tts_corpus.runtime.not_ready', provider: 'whisper-large-v3-turbo', cpuThreads: 2 });
-      } finally { checkingReadiness = false; }
-    }
     async function refresh() {
       if (!owner.active || reading) return;
       reading = true;
@@ -48,7 +37,6 @@ export function useTtsCorpus(current: SnapshotResponse, sharedClient?: StudioCli
       try {
         await client.bootstrap();
         if (!owner.active) return;
-        void refreshReadiness();
         const next = await client.ttsCorpus(owner.id, owner.abort.signal);
         if (!owner.active) return;
         // A read begun before a command cannot replace its result, even if a new corpus reset its revision.
@@ -58,7 +46,7 @@ export function useTtsCorpus(current: SnapshotResponse, sharedClient?: StudioCli
         if (owner.active) setReadError(failure instanceof ApiError ? failure.message : new ApiError('network').message);
       } finally {
         reading = false;
-        if (owner.active) { setLoading(false); schedule(corpusActive(owner.value) || owner.pending ? 2000 : 15000); }
+        if (owner.active) { setLoading(false); schedule(corpusActive(owner.value) || corpusCheckingResume(owner.value) || owner.pending ? 2000 : 15000); }
       }
     }
     void refresh();
@@ -94,7 +82,7 @@ export function useTtsCorpus(current: SnapshotResponse, sharedClient?: StudioCli
   }
   const value = corpus?.snapshot.projectId === current.snapshot.id ? corpus : null;
   const identity = value ? [current.snapshot.id, value.snapshot.id, value.snapshot.sourceRecordingId, value.snapshot.executionId ?? null] : [];
-  return { corpus: value, readiness, loading, pending, error: mutationError || readError, active: corpusActive(value),
+  return { corpus: value, loading, pending, error: mutationError || readError, active: corpusActive(value),
     audioUrl: (clipId: string) => value ? client.ttsCorpusAudioUrl(current.snapshot.id, value.snapshot.id, clipId) : '',
     start: () => command(JSON.stringify(['start', current.snapshot.id, current.snapshot.voiceRecording?.artifactId, current.etag, value?.snapshot.id ?? null]), (key, signal) => client.startTtsCorpus(current.snapshot.id, current.etag, key, signal)),
     control: (intent: 'stop' | 'resume') => value ? command(JSON.stringify([...identity, intent]), (key, signal) => client.controlTtsCorpus(current.snapshot.id, value, intent, key, signal), value.snapshot.id) : Promise.resolve(undefined),

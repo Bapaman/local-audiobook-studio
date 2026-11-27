@@ -31,7 +31,12 @@ public static class TextEndpoints
             long revision = await ApiRequest.CheckRevisionAsync(context, id, projects);
             var upload = await MultipartUploadReader.ReadAsync<FileMetadata>(context, TextImportService.MaximumFileBytes);
             using (upload.Content)
-                return ApiRequest.Snapshot(context, await text.ImportFileAsync(id, revision, upload.Metadata.DisplayName, upload.Content, context.RequestAborted));
+            {
+                var snapshot = upload.Metadata.SplitChapters
+                    ? await text.ImportBookFileAsync(id, revision, upload.Metadata.DisplayName, upload.Content, context.RequestAborted)
+                    : await text.ImportFileAsync(id, revision, upload.Metadata.DisplayName, upload.Content, context.RequestAborted);
+                return ApiRequest.Snapshot(context, snapshot);
+            }
         });
         endpoints.MapPost("/api/projects/{id}/text/paste", async (HttpContext context, string id, IStudioProjectService projects, IStudioTextService text) =>
         {
@@ -45,9 +50,21 @@ public static class TextEndpoints
             var command = await ApiRequest.JsonAsync<UpdateSpokenText>(context, 4096);
             return ApiRequest.Snapshot(context, await text.UpdateSpokenTextAsync(id, segmentId, revision, command, context.RequestAborted));
         });
+        endpoints.MapPatch("/api/projects/{id}/segments/{segmentId}/review", async (HttpContext context, string id, string segmentId, IStudioTextService text) =>
+        {
+            long revision = ApiRequest.Revision(context);
+            var command = await ApiRequest.JsonAsync<UpdateAudioReview>(context, 512);
+            return ApiRequest.Snapshot(context, await text.UpdateAudioReviewAsync(id, segmentId, revision, command, context.RequestAborted));
+        });
+        endpoints.MapPatch("/api/projects/{id}/segments/{segmentId}/correction", async (HttpContext context, string id, string segmentId, IStudioTextService text) =>
+        {
+            long revision = ApiRequest.Revision(context);
+            var command = await ApiRequest.JsonAsync<UpdateAudioCorrection>(context, 4096);
+            return ApiRequest.Snapshot(context, await text.UpdateAudioCorrectionAsync(id, segmentId, revision, command, context.RequestAborted));
+        });
         return endpoints;
     }
 
-    private sealed record FileMetadata(string DisplayName);
+    private sealed record FileMetadata(string DisplayName, bool SplitChapters = false);
     private sealed record AppendFileMetadata(string DisplayName, string TextId);
 }

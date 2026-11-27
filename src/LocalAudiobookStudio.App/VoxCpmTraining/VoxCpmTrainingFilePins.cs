@@ -6,7 +6,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace LocalAudiobookStudio.App.VoxCpmTraining;
 
-internal sealed class VoxCpmTrainingFilePins : IDisposable
+internal sealed class VoxCpmTrainingFilePins(string? writableDirectory = null) : IDisposable
 {
     private readonly List<IDisposable> owned = [];
     // Case-sensitive Windows directories can contain distinct objects for each
@@ -27,9 +27,11 @@ internal sealed class VoxCpmTrainingFilePins : IDisposable
         for (string? item = path; item != null && !directories.Contains(item); item = Path.GetDirectoryName(item)) chain.Push(item);
         while (chain.TryPop(out string? item))
         {
-            // Deny delete and data-write sharing: a retained ancestor cannot be
-            // moved or converted in place to a reparse point after its check.
-            var handle = CreateFileW(Extended(item), 1, 1, 0, 3, 0x02200000, 0);
+            // The training record's directory must allow atomic state replacement
+            // while the runner holds its execution subtree. Retain delete denial
+            // there and keep every other directory read-shared.
+            uint share = string.Equals(item, writableDirectory, StringComparison.Ordinal) ? 3u : 1u;
+            var handle = CreateFileW(Extended(item), 1, share, 0, 3, 0x02200000, 0);
             owned.Add(handle); Check(handle, true);
             directories.Add(item);
         }

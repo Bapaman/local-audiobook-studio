@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiError, StudioClient } from '../../api/client';
 import type { JobControl, JobKind, JobSnapshot, RuntimeReadiness, SavedVoiceSelection, SnapshotResponse } from '../../api/types';
 
+export const generationHistoryLimit = 32;
 export const terminal = (job: JobSnapshot) => ['completed', 'failed', 'canceled'].includes(job.state);
 type Scope = { id: string; active: boolean; abort: AbortController; jobs: JobSnapshot[]; pending: boolean; retry?: { signature: string; key: string } };
 
@@ -24,7 +25,7 @@ export function useProjectEvents(client: StudioClient, projectId: string | undef
     }
     let terminalCount = 0;
     owner.jobs = [...next.values()].sort((a, b) => b.createdUtc.localeCompare(a.createdUtc))
-      .filter(job => !terminal(job) || terminalCount++ < 32);
+      .filter(job => !terminal(job) || terminalCount++ < generationHistoryLimit);
     setJobs(owner.jobs);
   }
 
@@ -32,7 +33,17 @@ export function useProjectEvents(client: StudioClient, projectId: string | undef
     setJobs([]); setReadiness(undefined); setVoxReadiness(undefined); setError(''); setPending(false); setConnected(false);
     if (!projectId) { scope.current = undefined; return; }
     const owner: Scope = { id: projectId, active: true, abort: new AbortController(), jobs: [], pending: false }; scope.current = owner;
-    let reading = false; let again = false;
+    let reading = false; let again = false; let checkingVox = false;
+    async function refreshVoxReadiness() {
+      if (checkingVox || !owner.active) return;
+      checkingVox = true;
+      try {
+        const value = await client.voxCpmReadiness(owner.abort.signal);
+        if (owner.active) setVoxReadiness({ ...value, ready: value.ready === true && value.diagnosticCode === null && ['voxcpm2-saved-adapter-cpu-v1', 'voxcpm2-saved-adapter-reference-cpu-v1', 'voxcpm2-saved-adapter-controls-cpu-v1'].includes(value.profileId) });
+      } catch {
+        if (owner.active) setVoxReadiness({ ready: false, experimental: true, diagnosticCode: 'worker.runtime.not_ready', profileId: 'voxcpm2-saved-adapter-controls-cpu-v1' });
+      } finally { checkingVox = false; }
+    }
     async function refresh() {
       again = true;
       if (reading || !owner.active) return;
@@ -40,8 +51,9 @@ export function useProjectEvents(client: StudioClient, projectId: string | undef
       try {
         while (again && owner.active) {
           again = false;
-          const [project, latestJobs, runtime, vox] = await Promise.allSettled([
-            client.snapshot(`/api/projects/${owner.id}`), client.jobs(owner.id), client.readiness(owner.abort.signal), client.voxCpmReadiness(owner.abort.signal),
+          void refreshVoxReadiness();
+          const [project, latestJobs, runtime] = await Promise.allSettled([
+            client.snapshot(`/api/projects/${owner.id}`), client.jobs(owner.id), client.readiness(owner.abort.signal),
           ]);
           if (!owner.active) return;
           if (project.status === 'fulfilled') installProject(project.value);
@@ -50,10 +62,6 @@ export function useProjectEvents(client: StudioClient, projectId: string | undef
             const value = runtime.value;
             setReadiness({ ...value, ready: value.ready === true && value.diagnosticCode === null && ['q8-f16-cpu', 'q8-f16-hybrid-16'].includes(value.profileId) });
           } else setReadiness({ ready: false, experimental: true, diagnosticCode: 'worker.runtime.not_ready', profileId: 'q8-f16-cpu' });
-          if (vox.status === 'fulfilled') {
-            const value = vox.value;
-            setVoxReadiness({ ...value, ready: value.ready === true && value.diagnosticCode === null && ['voxcpm2-saved-adapter-cpu-v1', 'voxcpm2-saved-adapter-reference-cpu-v1', 'voxcpm2-saved-adapter-controls-cpu-v1'].includes(value.profileId) });
-          } else setVoxReadiness({ ready: false, experimental: true, diagnosticCode: 'worker.runtime.not_ready', profileId: 'voxcpm2-saved-adapter-controls-cpu-v1' });
           const failed = [project, latestJobs, runtime].find(value => value.status === 'rejected');
           if (failed?.status === 'rejected') setError(failed.reason instanceof ApiError ? failed.reason.message : new ApiError('network').message);
         }

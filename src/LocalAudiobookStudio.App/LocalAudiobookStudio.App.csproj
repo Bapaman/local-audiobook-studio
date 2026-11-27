@@ -31,13 +31,14 @@
     <Content Include="..\..\eng\locks\voxcpm2-inference.lock.json" Link="locks\voxcpm2-inference.lock.json"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
-  <Target Name="CopyManagedWorkerPayload" AfterTargets="Build" BeforeTargets="ComputeFilesToPublish">
-    <MSBuild Projects="..\LocalAudiobookStudio.WorkerHost\LocalAudiobookStudio.WorkerHost.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
-      <Output TaskParameter="TargetOutputs" ItemName="_ManagedWorkerTarget" />
-    </MSBuild>
+  <Target Name="CopyManagedWorkerPayload" AfterTargets="Build" BeforeTargets="ComputeFilesToPublish"
+          DependsOnTargets="ResolveProjectReferences">
     <ItemGroup>
+      <_ManagedWorkerTarget Include="@(_ResolvedProjectReferencePaths)"
+                            Condition="'%(_ResolvedProjectReferencePaths.Filename)' == 'LocalAudiobookStudio.WorkerHost'" />
       <_ManagedWorkerPayload Include="@(_ManagedWorkerTarget->'%(RootDir)%(Directory)LocalAudiobookStudio.WorkerHost.exe');@(_ManagedWorkerTarget->'%(RootDir)%(Directory)LocalAudiobookStudio.WorkerHost.deps.json');@(_ManagedWorkerTarget->'%(RootDir)%(Directory)LocalAudiobookStudio.WorkerHost.runtimeconfig.json')" />
     </ItemGroup>
+    <Error Condition="'@(_ManagedWorkerTarget)' == ''" Text="Unable to resolve the built WorkerHost project reference." />
     <!-- The referenced DLL and its transitive managed closure are copied by the SDK. -->
     <Copy SourceFiles="@(_ManagedWorkerPayload)" DestinationFolder="$(OutDir)" />
     <ItemGroup>

@@ -40,6 +40,39 @@ it('explicitly selects a historical Vox model independently of GGUF and sends on
   await user.click(screen.getByRole('button', { name: 'Проба голоса' }));
   expect(state.enqueue).toHaveBeenCalledWith('preview', ['s1'], '"2"', { savedVoxCpmModelId: 'accepted29', experimentalConfirmed: true, voxCpmOptions: options });
 });
+it('requires the same VoxCPM2 consent and retains the selected voice for the whole book', async () => {
+  const state = generation();
+  const user = userEvent.setup();
+  render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox}
+    bookRemainder={{ segmentIds: ['s1', 's2'], fragmentCount: 3 }} />);
+  await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), 'voxcpm:accepted29');
+  const launch = screen.getByRole('button', { name: 'Озвучить остаток книги' });
+  expect(launch).toBeDisabled();
+  await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение сохранённой модели/));
+  await waitFor(() => expect(launch).toBeEnabled());
+  await user.click(launch);
+  expect(state.enqueue).toHaveBeenCalledExactlyOnceWith('generation', ['s1', 's2'], '"2"',
+    { savedVoxCpmModelId: 'accepted29', experimentalConfirmed: true, voxCpmOptions: options });
+});
+it('announces model verification until the VoxCPM2 enqueuing request completes', async () => {
+  const state = generation();
+  let finish!: () => void;
+  const pending = new Promise<void>(resolve => { finish = resolve; });
+  state.enqueue.mockReturnValueOnce(pending);
+  const user = userEvent.setup();
+  render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
+  await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), 'voxcpm:accepted29');
+  await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение сохранённой модели/));
+  const launch = screen.getByRole('button', { name: 'Озвучить выбранные фрагменты' });
+  await waitFor(() => expect(launch).toBeEnabled());
+  await user.click(launch);
+
+  expect(screen.getByRole('status')).toHaveTextContent('Проверяем сохранённую модель VoxCPM2');
+  expect(launch).toBeDisabled();
+  await act(async () => { finish(); await pending; });
+  expect(screen.queryByText(/Проверяем сохранённую модель VoxCPM2/)).not.toBeInTheDocument();
+  expect(launch).toBeEnabled();
+});
 it('keeps a missing selected Vox model blocked with no fallback and resets consent on provider change', async () => {
   const state = generation(); const user = userEvent.setup();
   const { rerender } = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);

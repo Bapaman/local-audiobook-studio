@@ -46,6 +46,30 @@ public sealed class VoxCpmTrainingNativeExecutorTests
         Assert.Equal(new[] { "-I", "-S", "-B", "-u" }, launcher.StartInfo!.ArgumentList.Take(4));
         Assert.Equal(13958643712, launcher.Policy!.AggregateJobMemoryLimitBytes); Assert.Equal("1", launcher.StartInfo.Environment["HF_HUB_OFFLINE"]);
     }
+    [Fact]
+    public async Task Progress_can_atomically_replace_the_record_while_the_native_window_is_pinned()
+    {
+        using var fixture = new VoxProtocolFixture(local: true);
+        fixture.PrepareNative();
+        string recordDirectory = Path.Combine(fixture.Execution.ProjectRoot, "voxcpm-training");
+        Directory.CreateDirectory(recordDirectory);
+        string record = Path.Combine(recordDirectory, "state.json");
+        string pending = Path.Combine(recordDirectory, "state.part");
+        File.WriteAllText(record, "queued");
+        await using var executor = new VoxCpmTrainingNativeExecutor(new(fixture.Options, new VoxNativeInventory(fixture)),
+            new VoxNativeLauncher(fixture), new VoxNativeMemory());
+
+        var result = await executor.RunAsync(fixture.Execution, progress =>
+        {
+            File.WriteAllText(pending, progress.Phase);
+            File.Move(pending, record, overwrite: true);
+            Assert.Throws<IOException>(() => Directory.Move(recordDirectory, recordDirectory + ".moved"));
+            return Task.CompletedTask;
+        }, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(result.Checkpoint);
+        Assert.Equal("checkpointing", File.ReadAllText(record));
+    }
     [Theory]
     [InlineData("limits")]
     [InlineData("stdout")]

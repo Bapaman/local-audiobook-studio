@@ -20,7 +20,7 @@ try {
     if ($LASTEXITCODE -ne 0) {
         $testExitCode = $LASTEXITCODE
     } else {
-        & dotnet test --solution $solution -c $Configuration --no-restore
+        & dotnet test --solution $solution -c $Configuration --no-restore --max-parallel-test-modules 1
         $testExitCode = $LASTEXITCODE
         if ($testExitCode -eq 0) {
             $client = Join-Path $repositoryRoot 'src\LocalAudiobookStudio.App\ClientApp'

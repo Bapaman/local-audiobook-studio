@@ -174,6 +174,25 @@ public class WorkerPipeClientTests
     }
 
     [Fact]
+    public async Task Partial_reply_during_owned_stop_reports_interruption()
+    {
+        var owner = new StoppingOwner();
+        await using var peer = new Peer((_, _) => Task.CompletedTask, owner: owner, rawAfterHandshake: async (codec, stream, token) =>
+        {
+            Assert.Equal("synthesizeSegment", (await codec.ReadAsync(token))!.Type);
+            await owner.StopAsync(TimeSpan.Zero, token);
+            await stream.WriteAsync(new byte[] { 20, 0, 0, 0, (byte)'{' }, token);
+            await stream.FlushAsync(token);
+        });
+        var client = await Open(peer);
+        var error = await Assert.ThrowsAsync<WorkerClientException>(() => client.SynthesizeAsync(Guid.NewGuid().ToString("N"), Command, _ => { }, Token));
+        Assert.True(error.CleanupConfirmed);
+        var disposal = await Assert.ThrowsAsync<WorkerClientException>(async () => await client.DisposeAsync());
+        Assert.Equal("worker.interrupted", error.Code);
+        Assert.Equal(error.Code, disposal.Code);
+    }
+
+    [Fact]
     public async Task Private_remote_diagnostic_is_never_exposed_as_exception_detail()
     {
         await using var peer = new Peer(async (codec, token) =>
@@ -292,6 +311,17 @@ public class WorkerPipeClientTests
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> neverExited = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<bool> StopAsync(TimeSpan remaining, CancellationToken token) { Started.TrySetResult(); return neverExited.Task; }
+    }
+
+    private sealed class StoppingOwner : IWorkerSessionLifetime
+    {
+        private int stopping;
+        public bool StopRequested => Volatile.Read(ref stopping) != 0;
+        public Task<bool> StopAsync(TimeSpan remaining, CancellationToken token)
+        {
+            Interlocked.Exchange(ref stopping, 1);
+            return Task.FromResult(true);
+        }
     }
 
     private static Task<WorkerPipeClient> Open(Peer peer) => WorkerPipeClient.ConnectAsync(peer.Name, peer.Secret, peer.Owner, TimeProvider.System, new(), Token);

@@ -39,14 +39,42 @@ function serve(overrides: Record<string, Responder> = {}) {
   });
   return calls;
 }
-function open(busy = false, snapshot = project) {
-  return render(<ProjectWorkspacePage current={{ snapshot, etag: '"2"' }} generation={{ jobs: [], readiness: { ready: true, experimental: true, diagnosticCode: null, profileId: 'q8-f16-cpu' }, pending: false, error: '', connected: true, enqueue: async () => {}, control: async () => {} }} segmentRefresh={{}} busy={busy} headingRef={null} mutate={async () => {}} onBack={() => {}} />);
+function open(busy = false, snapshot = project, openTraining = true) {
+  const view = render(<ProjectWorkspacePage current={{ snapshot, etag: '"2"' }} generation={{ jobs: [], readiness: { ready: true, experimental: true, diagnosticCode: null, profileId: 'q8-f16-cpu' }, pending: false, error: '', connected: true, enqueue: async () => {}, control: async () => {} }} segmentRefresh={{}} busy={busy} headingRef={null} mutate={async () => {}} onBack={() => {}} />);
+  if (openTraining) {
+    fireEvent.click(screen.getByRole('button', { name: 'Дообучение' }));
+  }
+  return view;
 }
-const panel = () => screen.getByRole('region', { name: 'Корпус речи для VoxCPM2' });
+const panel = () => screen.getByRole('region', { name: 'Подготовка записи' });
 const writes = (calls: ReturnType<typeof serve>) => calls.filter(call => ['POST', 'PUT'].includes(call.init?.method ?? 'GET'));
 afterEach(() => vi.useRealTimers());
 
 describe('Russian corpus review', () => {
+  it('lets the user start preparation without waiting for a separate engine check', async () => {
+    let finish!: (result: Reply) => void;
+    const pending = new Promise<Reply>(resolve => { finish = resolve; });
+    const calls = serve({ [`GET ${read}`]: () => ({ body: null }), [`POST ${read}`]: () => pending });
+    const view = open(false, project, false);
+    await waitFor(() => expect(calls.some(call => call.path === read)).toBe(true));
+    expect(calls.some(call => call.path === '/api/projects/book1/voxcpm-training')).toBe(true);
+    const checks = ['/api/tts-corpus/readiness', '/api/voxcpm-training/readiness'];
+    expect(calls.filter(call => checks.includes(call.path))).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeEnabled();
+    expect(screen.queryByRole('heading', { name: 'Дообучение голоса' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Дообучение' }));
+    const start = within(panel()).getByRole('button', { name: 'Подготовить запись для обучения VoxCPM2' });
+    await userEvent.click(within(panel()).getByRole('checkbox', { name: /экспериментальную подготовку/ }));
+    expect(start).toBeEnabled();
+    await userEvent.click(start);
+    expect(await screen.findByText(/Проверяем файлы распознавания/)).toBeVisible();
+    expect(start).toBeDisabled();
+    expect(calls.filter(call => checks.includes(call.path))).toHaveLength(0);
+    await act(async () => { finish({ body: { ...corpus, state: 'queued' }, etag: '"3"' }); });
+    expect(screen.queryByRole('button', { name: 'Проба голоса' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Тексты этого голоса' })).not.toBeInTheDocument();
+    expect(view.container).toContainElement(panel());
+  });
   it('offers an explicit fresh preparation for a partial nonresumable draft while keeping approved versions', async () => {
     const versions = [{ id: 'v1', sha256: 'immutable-sha', clipCount: 1, retainedDurationSeconds: 10, createdUtc: corpus.createdUtc }];
     const calls = serve({ [`GET ${read}`]: () => ({ body: { ...corpus, state: 'interrupted', totalClipCount: 3, canResume: false, versions }, etag: '"3"' }),
@@ -60,6 +88,30 @@ describe('Russian corpus review', () => {
     expect(writes(calls)).toHaveLength(1); expect(writes(calls)[0].path).toBe(read);
     expect(new Headers(writes(calls)[0].init?.headers).get('If-Match')).toBe('"2"');
     expect(JSON.parse(writes(calls)[0].init!.body as string)).toEqual({ experimentalConfirmed: true });
+  });
+  it('keeps narration available while checking whether an interrupted draft can resume', async () => {
+    let checked = false;
+    const calls = serve({ [`GET ${read}`]: () => ({
+      body: { ...corpus, state: 'interrupted', phase: 'interrupted', totalClipCount: 3, revision: checked ? 4 : 3,
+        diagnosticCode: checked ? 'tts_corpus.interrupted' : 'tts_corpus.interrupted.checking', canResume: checked },
+      etag: checked ? '"4"' : '"3"',
+    }) });
+    vi.useFakeTimers();
+    const view = open(false, project, false);
+    await act(async () => {});
+    expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Дообучение' }));
+    fireEvent.click(within(panel()).getByRole('checkbox', { name: /экспериментальную подготовку/ }));
+    expect(within(panel()).getByRole('status')).toHaveTextContent('Проверяем, можно ли продолжить подготовку записи');
+    expect(within(panel()).getByRole('button', { name: 'Продолжить подготовку' })).toBeDisabled();
+    expect(within(panel()).queryByRole('button', { name: 'Начать подготовку заново' })).not.toBeInTheDocument();
+
+    checked = true;
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    expect(within(panel()).getByRole('button', { name: 'Продолжить подготовку' })).toBeEnabled();
+    expect(within(panel()).queryByRole('status')).not.toBeInTheDocument();
+    expect(writes(calls)).toHaveLength(0);
+    view.unmount();
   });
   it('uses a new start key for explicit replacement after a lost initial start is discovered by polling', async () => {
     let installed = false; let attempts = 0;
@@ -75,11 +127,9 @@ describe('Russian corpus review', () => {
     expect(new Headers(sent[0].init?.headers).get('Idempotency-Key')).not.toBe(new Headers(sent[1].init?.headers).get('Idempotency-Key'));
     expect(sent.map(call => new Headers(call.init?.headers).get('If-Match'))).toEqual(['"2"', '"2"']); view.unmount();
   });
-  it.each(['completed', 'transcribing'])('installs and keeps polling %s corpus while readiness is pending without duplicate readiness checks', async state => {
-    let resolve!: (reply: Reply) => void; let revision = 3;
-    const readiness = new Promise<Reply>(done => { resolve = done; });
-    const calls = serve({ 'GET /api/tts-corpus/readiness': () => readiness,
-      [`GET ${read}`]: () => ({ body: { ...corpus, state, revision, retainedDurationSeconds: revision }, etag: `"${revision}"` }) });
+  it.each(['completed', 'transcribing'])('keeps polling a %s recording without rechecking engine files', async state => {
+    let revision = 3;
+    const calls = serve({ [`GET ${read}`]: () => ({ body: { ...corpus, state, revision, retainedDurationSeconds: revision }, etag: `"${revision}"` }) });
     vi.useFakeTimers(); const view = open(); await act(async () => {});
     expect(screen.getByLabelText('Текст клипа 1')).toBeInTheDocument();
     if (state === 'completed') {
@@ -91,26 +141,26 @@ describe('Russian corpus review', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(state === 'transcribing' ? 2000 : 15000); });
     expect(panel()).toHaveTextContent('Сохранённая длительность: 4 с');
     expect(calls.filter(call => call.path === read)).toHaveLength(2);
-    expect(calls.filter(call => call.path === '/api/tts-corpus/readiness')).toHaveLength(1);
-    view.unmount(); expect(calls.find(call => call.path === '/api/tts-corpus/readiness')?.init?.signal?.aborted).toBe(true);
+    expect(calls.filter(call => call.path === '/api/tts-corpus/readiness')).toHaveLength(0);
+    view.unmount();
     const count = calls.length;
-    await act(async () => { resolve({ body: { ready: true, diagnosticCode: null, provider: 'whisper-large-v3-turbo', cpuThreads: 2 } }); await vi.advanceTimersByTimeAsync(30000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
     expect(calls).toHaveLength(count);
   });
-  it('ignores delayed readiness from a replaced project scope and aborts its pending check', async () => {
-    let resolve!: (reply: Reply) => void; let checks = 0;
+  it('aborts a pending read when the selected voice changes', async () => {
+    let resolve!: (reply: Reply) => void;
     const delayed = new Promise<Reply>(done => { resolve = done; });
-    const calls = serve({ 'GET /api/tts-corpus/readiness': () => ++checks === 1 ? delayed : { body: { ready: true, diagnosticCode: null, provider: 'whisper-large-v3-turbo', cpuThreads: 2 } },
+    const calls = serve({ [`GET ${read}`]: () => delayed,
       'GET /api/projects/book2/tts-corpus': () => ({ body: { ...corpus, projectId: 'book2', id: 'other-corpus' }, etag: '"3"' }) });
     const first = { snapshot: project, etag: '"2"' } as SnapshotResponse;
     const view = renderHook(({ current }) => useTtsCorpus(current), { initialProps: { current: first } });
-    await act(async () => {}); expect(view.result.current.corpus?.snapshot.id).toBe('corpus1');
+    await act(async () => {});
     view.rerender({ current: { ...first, snapshot: { ...first.snapshot, id: 'book2' } } });
     await act(async () => {});
-    expect(view.result.current.corpus?.snapshot.id).toBe('other-corpus'); expect(view.result.current.readiness?.ready).toBe(true);
-    expect(calls.find(call => call.path === '/api/tts-corpus/readiness')?.init?.signal?.aborted).toBe(true);
-    await act(async () => { resolve({ body: { ready: false, diagnosticCode: 'tts_corpus.runtime.not_ready', provider: 'whisper-large-v3-turbo', cpuThreads: 2 } }); });
-    expect(view.result.current.readiness?.ready).toBe(true); view.unmount();
+    expect(view.result.current.corpus?.snapshot.id).toBe('other-corpus');
+    expect(calls.find(call => call.path === read)?.init?.signal?.aborted).toBe(true);
+    await act(async () => { resolve({ body: corpus, etag: '"3"' }); });
+    expect(view.result.current.corpus?.snapshot.id).toBe('other-corpus'); view.unmount();
   });
   it('keeps fresh preparation disabled while another project operation is busy', async () => {
     serve({ [`GET ${read}`]: () => ({ body: { ...corpus, state: 'interrupted', canResume: false }, etag: '"3"' }) }); open(true);
@@ -146,14 +196,16 @@ describe('Russian corpus review', () => {
     expect(new Headers(call.init?.headers).get('If-Match')).toBe('"2"');
     expect(new Headers(call.init?.headers).get('X-CSRF-TOKEN')).toBe('csrf');
     expect(new Headers(call.init?.headers).get('Idempotency-Key')).toBeTruthy();
-    expect(panel()).toHaveTextContent(/ещё не обученная голосовая модель/);
   });
-  it('explains an unavailable runtime and needs an accepted recording', async () => {
-    serve({ [`GET ${read}`]: () => ({ body: null }), 'GET /api/tts-corpus/readiness': () => ({ body: { ready: false, diagnosticCode: 'tts_corpus.runtime.not_ready', provider: 'whisper-large-v3-turbo', cpuThreads: 2 } }) });
-    open(false, { ...project, voiceRecording: null } as unknown as typeof project);
-    expect(await screen.findByText(/tts_corpus.runtime.not_ready/)).toBeInTheDocument();
-    expect(within(panel()).getByRole('button', { name: 'Подготовить запись для обучения VoxCPM2' })).toBeDisabled();
-    expect(panel()).toHaveTextContent(/Сначала сохраните исходную запись/);
+  it('explains an unavailable speech recognition runtime after an attempted start', async () => {
+    serve({ [`GET ${read}`]: () => ({ body: null }), [`POST ${read}`]: () => ({ status: 503, body: { code: 'tts_corpus.runtime.not_ready' } }) });
+    open();
+    const user = userEvent.setup();
+    await user.click(within(panel()).getByRole('checkbox', { name: /экспериментальную подготовку/ }));
+    const start = within(panel()).getByRole('button', { name: 'Подготовить запись для обучения VoxCPM2' });
+    await user.click(start);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/распознавание не настроено/);
+    expect(start).toBeEnabled();
   });
   it('saves edits as unreviewed before a separate explicit review, preserving immutable versions', async () => {
     const version = { id: 'version1', sha256: 'immutable-sha', clipCount: 1, retainedDurationSeconds: 10, createdUtc: corpus.createdUtc };
@@ -257,8 +309,11 @@ describe('Russian corpus review', () => {
     const calls = serve({ [`GET ${read}`]: () => ({ body: { ...corpus, state: 'transcribing', phase: 'transcribing', revision: count + 2, completedClipCount: count, totalClipCount: 3 }, etag: `"${count + 2}"` }) });
     vi.useFakeTimers(); const view = open(); await act(async () => {});
     expect(panel()).toHaveTextContent('Готовые клипы: 1 из 3');
-    expect(screen.getByLabelText('Произносимый текст 1')).toBeDisabled();
+    expect(screen.getByLabelText('Текст фрагмента 1')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Озвучивание' }));
     expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Дообучение' }));
+    fireEvent.click(screen.getByText('Прежний способ обучения · RVC'));
     expect(screen.getByRole('button', { name: 'Обучить голос' })).toBeDisabled();
     expect(screen.getByLabelText('Текст клипа 1')).toBeDisabled();
     count = 2; await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
@@ -272,9 +327,9 @@ describe('Russian corpus review', () => {
     serve({ [`GET ${read}`]: () => ({ body: null }), [`POST ${read}`]: () => pending }); open(); const user = userEvent.setup();
     await user.click(await screen.findByRole('checkbox', { name: /экспериментальную подготовку/ }));
     await user.click(screen.getByRole('button', { name: 'Подготовить запись для обучения VoxCPM2' }));
-    await waitFor(() => expect(screen.getByLabelText('Произносимый текст 1')).toBeDisabled());
+    await waitFor(() => expect(screen.getByLabelText('Текст фрагмента 1')).toBeDisabled());
     await act(async () => { reject(new Error('Lost response')); });
-    await waitFor(() => expect(screen.getByLabelText('Произносимый текст 1')).toBeEnabled());
+    await waitFor(() => expect(screen.getByLabelText('Текст фрагмента 1')).toBeEnabled());
   });
   it('resumes only server-authorized matching source and uses corpus CAS', async () => {
     const calls = serve({ [`GET ${read}`]: () => ({ body: { ...corpus, state: 'paused', canResume: true }, etag: '"3"' }),

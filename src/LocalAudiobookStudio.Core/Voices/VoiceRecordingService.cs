@@ -10,10 +10,15 @@ public sealed record ConfirmVoiceAnchor(long StartMilliseconds, long EndMillisec
 
 public sealed class VoiceRecordingPolicy
 {
+    private const int SamplesPerMillisecond = 48;
+    private const int MinimumRecordingMilliseconds = 5_000;
+    private const int MinimumSelectableAnchorMilliseconds = 10_000;
+    private const int MaximumAnchorMilliseconds = 20_000;
+
     public long MinimumSamples { get; }
     public long MaximumSamples { get; }
     public long MaximumBytes { get; }
-    public VoiceRecordingPolicy(long minimumSamples = 14400000, long maximumSamples = 57600000, long maximumBytes = 1L << 30)
+    public VoiceRecordingPolicy(long minimumSamples = MinimumRecordingMilliseconds * SamplesPerMillisecond, long maximumSamples = 57600000, long maximumBytes = 1L << 30)
     {
         if (minimumSamples <= 0 || maximumSamples < minimumSamples || maximumSamples > 57600000 || maximumBytes <= 0 || maximumBytes > 1L << 30)
             throw new ArgumentOutOfRangeException(nameof(minimumSamples));
@@ -24,6 +29,15 @@ public sealed class VoiceRecordingPolicy
         if (inspection.Channels != 1 || inspection.SampleRate != 48000 || inspection.BitsPerSample != 16 || inspection.BlockAlignment != 2) throw new ProjectException("wav.format");
         if (inspection.SampleCount < MinimumSamples) throw new ProjectException("voice.recording.too_short");
         if (inspection.SampleCount > MaximumSamples) throw new ProjectException("voice.recording.too_long");
+    }
+
+    internal static bool IsAnchorRangeValid(long recordingSamples, long start, long end)
+    {
+        long duration = recordingSamples / SamplesPerMillisecond;
+        if (start < 0 || end <= start || end > duration) return false;
+        return duration < MinimumSelectableAnchorMilliseconds
+            ? duration >= MinimumRecordingMilliseconds && start == 0 && end == duration
+            : end - start is >= MinimumSelectableAnchorMilliseconds and <= MaximumAnchorMilliseconds;
     }
 }
 
@@ -110,7 +124,7 @@ public sealed class VoiceRecordingService(VoiceRecordingPolicy? policy = null)
         if (project.State.Voice != null) throw new ProjectException("voice.exists");
         var recording = project.State.VoiceRecording ?? throw new ProjectException("voice.recording.missing");
         long start = command.StartMilliseconds, end = command.EndMilliseconds;
-        if (start < 0 || end <= start || end - start is < 10000 or > 20000 || end > recording.SampleCount / 48) throw new ProjectException("voice.anchor.range");
+        if (!VoiceRecordingPolicy.IsAnchorRangeValid(recording.SampleCount, start, end)) throw new ProjectException("voice.anchor.range");
         string part = $"voice-anchor-staging/{Guid.NewGuid():N}.wav.part";
         await lease.RegisterPendingArtifactAsync(part, null, cancellationToken);
         try

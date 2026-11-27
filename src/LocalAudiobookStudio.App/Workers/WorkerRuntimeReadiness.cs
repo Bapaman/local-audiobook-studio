@@ -36,7 +36,7 @@ public sealed class WorkerRuntimeReadiness(DeveloperWorkerOptions? options, stri
             await ValidateAsync(token);
             // Non-runtime identities are supplied from the accepted project by the
             // application runner. Source revisions are NOT binary SHA256/provenance.
-            return new(new("voxcpm2-local-v1", options!.ProfileId, 70, 10, 2, 1, 42, options.AllowCpuFallback),
+            return new(new(GenerationPreset.VoxCpmLocalId, options!.ProfileId, GenerationPreset.VoxCpmLocalDecodeSteps, 10, 2, 1, 42, options.AllowCpuFallback),
                 new VersionPins("", ArtifactResolver.WorkerVersion, ArtifactResolver.ModelVersion, "", "", ""));
         }
         catch (OperationCanceledException) { throw; }

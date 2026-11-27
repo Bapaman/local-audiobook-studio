@@ -113,11 +113,22 @@ public sealed class StudioProjectService(ProjectCatalogOptions options, IProject
 
     private async Task<ProjectReadSnapshot> ReadBrowserSnapshotAsync(string id, CancellationToken token)
     {
-        // Registered active projects can be read without studio/artifact ownership.
-        // A closed WAL/legacy or discovery candidate uses only the stable copy.
-        var current = await TryReadCurrentAsync(id, token);
-        if (current != null) return current;
-        return await WithLeaseAsync(async inner => await FindSnapshotAsync(id, inner), token);
+        for (int attempt = 0; ; attempt++)
+        {
+            // The coordinator may prepare the source in between attempts.
+            var current = await TryReadCurrentAsync(id, token);
+            if (current != null) return current;
+            try
+            {
+                return await WithLeaseAsync(inner => FindSnapshotAsync(id, inner, reportSharingContention: true), token);
+            }
+            catch (StudioException e) when (e.Code == "catalog.snapshot.busy")
+            {
+                if (attempt == 4) throw new StudioException("project.unavailable");
+                // WithLeaseAsync has released the studio lock before waiting.
+                await Task.Delay(TimeSpan.FromMilliseconds(50), token);
+            }
+        }
     }
 
     private async Task<ProjectReadSnapshot?> TryReadCurrentAsync(string id, CancellationToken token)
@@ -135,12 +146,12 @@ public sealed class StudioProjectService(ProjectCatalogOptions options, IProject
     private async Task<ProjectState> FindStateAsync(string id, CancellationToken token)
         => (await FindSnapshotAsync(id, token)).State;
 
-    private async Task<ProjectReadSnapshot> FindSnapshotAsync(string id, CancellationToken token)
+    private async Task<ProjectReadSnapshot> FindSnapshotAsync(string id, CancellationToken token, bool reportSharingContention = false)
     {
         var candidates = await catalog.ReconcileAsync(token);
         if (!candidates.Any(x => x.Id == id)) throw new StudioException("project.unavailable");
         if (candidates.Any(x => x.Id == id && x.Pending) && IsPreMainReservation(id)) throw new StudioException("project.unavailable");
-        var snapshot = await ProbeStableCandidateSnapshotAsync(id, token) ?? throw new StudioException("project.unavailable");
+        var snapshot = await ProbeStableCandidateSnapshotAsync(id, token, reportSharingContention) ?? throw new StudioException("project.unavailable");
         await catalog.InsertAsync(new(id, DateTimeOffset.MinValue), token);
         return snapshot;
     }
@@ -220,19 +231,19 @@ public sealed class StudioProjectService(ProjectCatalogOptions options, IProject
         return await ProbeStableCandidateSnapshotAsync(id, token);
     }
 
-    private async Task<ProjectReadSnapshot?> ProbeStableCandidateSnapshotAsync(string id, CancellationToken token)
+    private async Task<ProjectReadSnapshot?> ProbeStableCandidateSnapshotAsync(string id, CancellationToken token, bool reportSharingContention = false)
     {
         try
         {
             using var pins = paths.PinProject(id);
-            using var snapshot = GuardedSqliteSnapshot.Create(paths, Path.Combine(paths.Project(id), "project.sqlite"), token);
+            using var snapshot = GuardedSqliteSnapshot.Create(paths, Path.Combine(paths.Project(id), "project.sqlite"), token, reportSharingContention);
             var read = await core.ProbeSnapshotDetailsAsync(paths.Project(id), snapshot.Database, token); ValidateState(read.State, id); return read;
         }
         catch (Exception e) when (IsConfirmedInvalid(e))
         {
             await catalog.QuarantineAsync(id, token); return null;
         }
-        catch (Exception e) when (e is ProjectException or StudioException or IOException or UnauthorizedAccessException)
+        catch (Exception e) when (e is ProjectException or StudioException { Code: not "catalog.snapshot.busy" } or IOException or UnauthorizedAccessException)
         {
             // Omit an inaccessible candidate for this probe only. It remains eligible
             // for the next reconciliation after a lock or access interruption ends.
@@ -258,13 +269,21 @@ public sealed class StudioProjectService(ProjectCatalogOptions options, IProject
         if (title.Length is 0 or > 120) throw new StudioException("project.title.invalid");
         return title;
     }
-    private static ProjectSnapshotDto Map(ProjectReadSnapshot snapshot) => Map(snapshot.State, snapshot.OutputArtifactIds);
-    internal static ProjectSnapshotDto Map(ProjectState state, IReadOnlyDictionary<string, string>? outputArtifactIds = null) => new(state.Metadata.Id, state.Metadata.Title, state.Revision,
+    private static ProjectSnapshotDto Map(ProjectReadSnapshot snapshot) => Map(snapshot.State, snapshot.OutputArtifactIds, snapshot.PreviousAudio);
+    internal static ProjectSnapshotDto Map(ProjectState state, IReadOnlyDictionary<string, string>? outputArtifactIds = null,
+        IReadOnlyDictionary<string, PreviousSegmentAudio>? previousAudio = null) => new(state.Metadata.Id, state.Metadata.Title, state.Revision,
         state.VoiceRecording is { } recording ? new(recording.Id, recording.Sha256, recording.ByteLength, recording.SampleCount / 48, recording.HasClippingWarning) : null,
         state.Voice is { StartMilliseconds: { } start, EndMilliseconds: { } end } voice ? new(voice.Id, start, end, voice.Transcript) : null,
         state.Chapters.FirstOrDefault() is { } chapter ? MapDocument(chapter) : null,
-        state.Segments.Select(x => new SegmentDto(x.Id, x.Order, x.OriginalText, x.NormalizedText, x.SpokenText, x.TextHash, x.Status,
-            outputArtifactIds != null && outputArtifactIds.TryGetValue(x.Id, out var artifactId) ? artifactId : null)).ToArray(),
+        state.Segments.Select(x =>
+        {
+            var previous = previousAudio?.GetValueOrDefault(x.Id);
+            var current = outputArtifactIds?.GetValueOrDefault(x.Id);
+            return new SegmentDto(x.Id, x.Order, x.OriginalText, x.NormalizedText, x.SpokenText, x.TextHash, x.Status,
+                current, previous == null ? null : new(previous.ArtifactId, previous.SpokenText),
+                current != null && current == x.ReviewedArtifactId,
+                x.Correction is { } correction ? new(correction.Note, correction.NeedsNewAudio(current)) : null);
+        }).ToArray(),
         state.Chapters.Count > 0, state.Voice != null,
         state.Chapters.Count > 1 && state.Chapters.All(c => c.Provenance != null) ? state.Chapters.OrderBy(c => c.Order).Select(c =>
             new ProjectTextDocumentDto(c.Id,c.Order,MapDocument(c)!,state.Segments.Where(s => s.ChapterId == c.Id).OrderBy(s => s.Order).Select(s => s.Id).ToArray())).ToArray() : null);
@@ -272,6 +291,19 @@ public sealed class StudioProjectService(ProjectCatalogOptions options, IProject
     private static TextDocumentDto? MapDocument(ChapterRecord chapter) => chapter.Provenance is { } provenance ?
         new(provenance.SourceKind.ToString(),provenance.DisplayName,provenance.SourceEncoding,provenance.SourceHash,
             provenance.OriginalByteCount,chapter.OriginalText,chapter.NormalizedText) : null;
+
+    internal Task CheckVoiceUploadAsync(string projectId, long expectedRevision, CancellationToken cancellationToken)
+    {
+        CatalogPaths.ValidateId(projectId);
+        return WithErrorsAsync(async token =>
+        {
+            var before = await ReadBrowserSnapshotAsync(projectId, token);
+            if (before.HasActiveJob) throw new StudioException("job.active");
+            if (before.State.Revision != expectedRevision) throw new StudioException("project.conflict");
+            if (before.State.VoiceRecording != null) throw new StudioException("voice.recording.exists");
+            return true;
+        }, cancellationToken);
+    }
 
     internal async Task<ProjectSnapshotDto> WriteAsync(string projectId, long expectedRevision, Func<ProjectDatabase, CancellationToken, Task> action, CancellationToken token)
     {

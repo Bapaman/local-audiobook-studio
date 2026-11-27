@@ -8,7 +8,11 @@ public enum JobState { Queued, Preparing, Running, PauseRequested, Paused, Cance
 public enum JobRequestedState { Run, Pause, Cancel }
 public enum JobControlCommand { Pause, Resume, Cancel }
 public enum GenerationFailureDisposition { Terminal, RetryCpu }
-public sealed record GenerationPreset(string Id, string ProfileId, int Steps, int Timesteps, double Cfg, double Temperature, long Seed, bool AllowCpuFallback);
+public sealed record GenerationPreset(string Id, string ProfileId, int Steps, int Timesteps, double Cfg, double Temperature, long Seed, bool AllowCpuFallback)
+{
+    public const string VoxCpmLocalId = "voxcpm2-local-v2";
+    public const int VoxCpmLocalDecodeSteps = 140;
+}
 public sealed record GenerationItemInput(string SegmentId, int Order, string SpokenText, string TextHash, string? PreviousSentenceContextHash, string? NextSentenceContextHash, SegmentBoundary? BoundaryAfter, VersionPins Versions);
 public sealed record SavedVoiceBinding(string ModelId, string WorkflowRelativePath, string WorkflowSha256,
     string SourceRecordingId, string SourceWavRelativePath, string SourceSha256, long GlobalStep,

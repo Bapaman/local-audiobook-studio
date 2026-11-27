@@ -11,8 +11,10 @@ public sealed class VoiceRecordingServiceTests
     private static VoiceRecordingService Service(long bytes = 1L << 30) => new(new(48000, 1440000, bytes));
 
     [Theory]
-    [InlineData(14399999, "voice.recording.too_short")]
-    [InlineData(14400000, null)]
+    [InlineData(239_999, "voice.recording.too_short")]
+    [InlineData(240_000, null)]
+    [InlineData(2_879_999, null)]
+    [InlineData(14_400_000, null)]
     [InlineData(57600000, null)]
     [InlineData(57600001, "voice.recording.too_long")]
     public void Default_policy_uses_inclusive_integer_sample_boundaries(long samples, string? code)
@@ -20,6 +22,33 @@ public sealed class VoiceRecordingServiceTests
         var inspection = new WavInspection(1, 48000, 16, 2, 44, samples * 2, samples, TimeSpan.Zero, 0, false, "");
         if (code == null) new VoiceRecordingPolicy().Validate(inspection);
         else Assert.Equal(code, Assert.Throws<ProjectException>(() => new VoiceRecordingPolicy().Validate(inspection)).Code);
+    }
+
+    [Theory]
+    [InlineData(5000, 0, 5000, null)]
+    [InlineData(8267, 0, 8267, null)]
+    [InlineData(8267, 1000, 8267, "voice.anchor.range")]
+    [InlineData(8267, 0, 8000, "voice.anchor.range")]
+    public async Task Short_recording_requires_its_full_range_for_the_voice_sample(int duration, int start, int end, string? code)
+    {
+        using var box = new ProjectSandbox();
+        var projects = new ProjectService();
+        await using var project = await projects.CreateAsync(box.ProjectRoot, "Synthetic", Token);
+        using var stream = File.OpenRead(VoiceProfileServiceTests.WriteWav(box.Root, duration * 48));
+        var service = new VoiceRecordingService();
+        await service.ImportAsync(project, new("short.wav", true), stream, Token);
+        var command = new ConfirmVoiceAnchor(start, end, "Пять секунд речи.", true);
+        if (code != null)
+        {
+            Assert.Equal(code, (await Assert.ThrowsAsync<ProjectException>(() => service.ConfirmAnchorAsync(project, command, Token))).Code);
+            Assert.Null(project.State.Voice);
+            return;
+        }
+
+        var anchor = await service.ConfirmAnchorAsync(project, command, Token);
+        await using var reopened = await projects.OpenAsync(box.ProjectRoot, Token);
+        Assert.Equal(anchor, reopened.State.Voice);
+        Assert.Equal(duration * 48, (await WavInspector.InspectAsync(project.ResolveOwnedPath(anchor.WavRelativePath), Token)).SampleCount);
     }
 
     [Fact]

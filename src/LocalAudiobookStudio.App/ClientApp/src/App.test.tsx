@@ -37,30 +37,56 @@ function serve(replies: Record<string, Reply | Reply[]>) {
 async function launch(snapshot: unknown = empty, extras: Record<string, Reply | Reply[]> = {}) {
   const calls = serve({ 'GET /api/bootstrap': { body: bootstrap }, 'GET /api/projects': { body: [] }, 'POST /api/projects': { body: snapshot, status: 201, etag: '"1"' }, ...extras });
   const user = userEvent.setup(); render(<App />);
-  await screen.findByText('Пока нет проектов');
-  await user.type(screen.getByLabelText('Название проекта'), 'Моя книга');
-  await user.click(screen.getByRole('button', { name: 'Создать проект' }));
+  await screen.findByText('Пока нет голосов');
+  await user.type(screen.getByLabelText('Название голоса'), 'Моя книга');
+  await user.click(screen.getByRole('button', { name: 'Добавить голос' }));
   await screen.findByRole('heading', { name: 'Моя книга' });
   return { user, calls };
 }
 describe('Stage 1 project setup', () => {
+  it('uploads a voice message and opens corpus preparation straight from the saved recording', async () => {
+    const { user, calls } = await launch(empty, {
+      'GET /api/bootstrap': { body: { ...bootstrap, capabilities: { ...bootstrap.capabilities, voiceMessages: true } } },
+      'POST /api/projects/book1/voice/recording': { body: recording, etag: '"2"' },
+    });
+    await user.click(screen.getByRole('button', { name: 'Голос' }));
+    const input = screen.getByLabelText('Файл записи голоса');
+    expect(input).toHaveAttribute('accept', '.wav,.ogg,.oga,.opus,.m4a,.mp3');
+    await user.upload(input, new File(['synthetic'], 'voice.ogg', { type: 'audio/ogg' }));
+    await user.click(screen.getByLabelText(/мой голос/));
+    await user.click(screen.getByRole('button', { name: 'Сохранить запись' }));
+    await screen.findByText(/Исходная запись сохранена/);
+    const upload = calls.find(call => call.path.endsWith('/voice/recording'))?.init?.body as Blob;
+    const body = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(upload);
+    });
+    expect(body).toContain('{"fileName":"voice.ogg","rightsConfirmed":true}');
+    await user.click(screen.getByRole('button', { name: 'Перейти к дообучению' }));
+    expect(screen.getByRole('heading', { name: 'Дообучение голоса' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Подготовить запись для обучения VoxCPM2' })).toBeVisible();
+  });
   it('shows accepted legacy text and voice read-only and hides incompatible imports', async () => {
-    await launch({ ...text, textDocument: null, voiceAnchor: null, hasAcceptedText: true, hasAcceptedVoice: true });
-    expect(screen.getByLabelText('Произносимый текст 1')).toHaveValue(source);
-    expect(screen.getByLabelText('Произносимый текст 1')).toHaveAttribute('readonly');
+    const { user } = await launch({ ...text, textDocument: null, voiceAnchor: null, hasAcceptedText: true, hasAcceptedVoice: true });
+    await user.click(screen.getByRole('button', { name: 'Открыть тексты' }));
+    expect(screen.getByLabelText('Текст фрагмента 1')).toHaveValue(source);
+    expect(screen.getByLabelText('Текст фрагмента 1')).toHaveAttribute('readonly');
     expect(screen.queryByRole('button', { name: 'Сохранить фрагмент 1' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Импортировать текст' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Голос' }));
     expect(screen.queryByLabelText('Запись голоса WAV')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Выберите голосовой фрагмент' })).not.toBeInTheDocument();
     expect(screen.getByText(/Голос сохранён в старом формате/)).toBeInTheDocument();
-    expect(screen.getAllByText(/создайте новый проект/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/добавьте/).length).toBeGreaterThan(0);
   });
   it('limits submitted titles to 120 UTF-16 units and explains the same server limit', async () => {
     const calls = serve({ 'GET /api/bootstrap': { body: bootstrap }, 'GET /api/projects': { body: [] },
       'POST /api/projects': { body: { code: 'project.title.invalid' }, status: 400 } });
-    const user = userEvent.setup(); render(<App />); await screen.findByText('Пока нет проектов');
-    await user.type(screen.getByLabelText('Название проекта'), 'я'.repeat(121));
-    await user.click(screen.getByRole('button', { name: 'Создать проект' }));
+    const user = userEvent.setup(); render(<App />); await screen.findByText('Пока нет голосов');
+    await user.type(screen.getByLabelText('Название голоса'), 'я'.repeat(121));
+    await user.click(screen.getByRole('button', { name: 'Добавить голос' }));
     expect(JSON.parse(calls.find(x => x.init?.method === 'POST')!.init!.body as string).displayName).toHaveLength(120);
     expect(await screen.findByRole('alert')).toHaveTextContent('до 120 символов UTF-16');
   });
@@ -72,25 +98,29 @@ describe('Stage 1 project setup', () => {
       'PATCH /api/projects/book1/segments/segment1': { body: firstSaved, etag: '"3"' },
       'PATCH /api/projects/book1/segments/segment2': { body: bothSaved, etag: '"4"' },
     });
-    await user.clear(screen.getByLabelText('Произносимый текст 1')); await user.type(screen.getByLabelText('Произносимый текст 1'), 'Первая правка.');
-    await user.clear(screen.getByLabelText('Произносимый текст 2')); await user.type(screen.getByLabelText('Произносимый текст 2'), 'Вторая правка.');
+    await user.click(screen.getByRole('button', { name: 'Тексты' }));
+    await user.clear(screen.getByLabelText('Текст фрагмента 1')); await user.type(screen.getByLabelText('Текст фрагмента 1'), 'Первая правка.');
+    await user.clear(screen.getByLabelText('Текст фрагмента 2')); await user.type(screen.getByLabelText('Текст фрагмента 2'), 'Вторая правка.');
     await user.click(screen.getByRole('button', { name: 'Сохранить фрагмент 1' }));
-    await screen.findByText('Версия 3');
-    expect(screen.getByLabelText('Произносимый текст 2')).toHaveValue('Вторая правка.');
+    await screen.findByTitle('Версия 3');
+    expect(screen.getByLabelText('Текст фрагмента 2')).toHaveValue('Вторая правка.');
     expect(screen.getByRole('button', { name: 'Сохранить фрагмент 1' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Сохранить фрагмент 2' }));
-    await screen.findByText('Версия 4');
-    expect(screen.getByLabelText('Произносимый текст 1')).toHaveValue('Первая правка.');
+    await screen.findByTitle('Версия 4');
+    expect(screen.getByLabelText('Текст фрагмента 1')).toHaveValue('Первая правка.');
     expect(screen.getByRole('button', { name: 'Сохранить фрагмент 2' })).toBeDisabled();
     expect(calls.filter(x => x.init?.method === 'PATCH').map(x => new Headers(x.init?.headers).get('If-Match'))).toEqual(['"2"', '"3"']);
   });
   it('retains pasted book text while saving the unrelated recording', async () => {
     const { user } = await launch(empty, { 'POST /api/projects/book1/voice/recording': { body: recording, etag: '"2"' } });
+    await user.click(screen.getByRole('button', { name: 'Добавить текст' }));
     await user.type(screen.getByLabelText('Текст книги'), 'Несохранённая книга с ё.');
+    await user.click(screen.getByRole('button', { name: 'Голос' }));
     await user.upload(screen.getByLabelText('Запись голоса WAV'), new File(['synthetic'], 'voice.wav', { type: 'audio/wav' }));
     await user.click(screen.getByLabelText(/мой голос/));
     await user.click(screen.getByRole('button', { name: 'Сохранить запись' }));
     await screen.findByRole('heading', { name: 'Выберите голосовой фрагмент' });
+    await user.click(screen.getByRole('button', { name: 'Тексты' }));
     expect(screen.getByLabelText('Текст книги')).toHaveValue('Несохранённая книга с ё.');
   });
   it('retains unconfirmed voice range, transcript and explicit confirmation across text import', async () => {
@@ -99,13 +129,17 @@ describe('Stage 1 project setup', () => {
       'POST /api/projects': { body: recording, etag: '"2"' },
       'POST /api/projects/book1/text/paste': { body: { ...text, revision: 3, voiceRecording: recording.voiceRecording }, etag: '"3"' },
     });
+    await user.click(screen.getByRole('button', { name: 'Голос' }));
     await user.clear(screen.getByLabelText('Начало, секунды')); await user.type(screen.getByLabelText('Начало, секунды'), '5');
     await user.clear(screen.getByLabelText('Конец, секунды')); await user.type(screen.getByLabelText('Конец, секунды'), '17');
     await user.type(screen.getByLabelText('Точный текст фрагмента'), 'Ёжик читает ма\u0301ме.');
     await user.click(screen.getByLabelText('Прослушал и подтверждаю'));
+    await user.click(screen.getByRole('button', { name: 'Тексты' }));
     await user.type(screen.getByLabelText('Текст книги'), source);
     await user.click(screen.getByRole('button', { name: 'Импортировать текст' }));
-    await screen.findByText('Версия 3');
+    await screen.findByTitle('Версия 3');
+    await user.click(screen.getByRole('button', { name: 'Озвучивание' }));
+    await user.click(screen.getByRole('button', { name: 'Подтвердить образец' }));
     expect(screen.getByLabelText('Начало, секунды')).toHaveValue(5);
     expect(screen.getByLabelText('Конец, секунды')).toHaveValue(17);
     expect(screen.getByLabelText('Точный текст фрагмента')).toHaveValue('Ёжик читает ма\u0301ме.');
@@ -121,28 +155,34 @@ describe('Stage 1 project setup', () => {
       'PATCH /api/projects/book1/segments/segment1': { body: { code: 'project.conflict', conflictType: 'project', currentSnapshot: authoritative }, status: 412, etag: '"3"' },
       'PATCH /api/projects/book1/segments/segment2': { body: secondSaved, etag: '"4"' },
     });
-    await user.clear(screen.getByLabelText('Произносимый текст 1')); await user.type(screen.getByLabelText('Произносимый текст 1'), 'Несохранённая первая правка.');
-    await user.clear(screen.getByLabelText('Произносимый текст 2')); await user.type(screen.getByLabelText('Произносимый текст 2'), 'Моя вторая правка.');
+    await user.click(screen.getByRole('button', { name: 'Тексты' }));
+    await user.clear(screen.getByLabelText('Текст фрагмента 1')); await user.type(screen.getByLabelText('Текст фрагмента 1'), 'Несохранённая первая правка.');
+    await user.clear(screen.getByLabelText('Текст фрагмента 2')); await user.type(screen.getByLabelText('Текст фрагмента 2'), 'Моя вторая правка.');
     await user.click(screen.getByRole('button', { name: 'Сохранить фрагмент 1' }));
     await screen.findByRole('alert');
-    expect(screen.getByRole('alert')).toHaveTextContent('Правка фрагмента не сохранена. Загружена текущая версия проекта; конфликтующий фрагмент обновлён. Проверьте его перед новой правкой.');
-    expect(screen.getByLabelText('Произносимый текст 1')).toHaveValue(source);
-    expect(screen.getByLabelText('Произносимый текст 2')).toHaveValue('Моя вторая правка.');
+    expect(screen.getByRole('alert')).toHaveTextContent(/Правка фрагмента не сохранена. Загружена текущая версия фрагмента/);
+    expect(screen.getByLabelText('Текст фрагмента 1')).toHaveValue(source);
+    expect(screen.getByLabelText('Текст фрагмента 2')).toHaveValue('Моя вторая правка.');
     expect(calls.filter(x => x.init?.method === 'PATCH')).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: 'Сохранить фрагмент 2' }));
-    await screen.findByText('Версия 4');
+    await screen.findByTitle('Версия 4');
     expect(new Headers(calls.filter(x => x.init?.method === 'PATCH')[1].init?.headers).get('If-Match')).toBe('"3"');
   });
-  it('bootstraps once, creates an empty project with CSRF and an idempotency key, and honestly disables ML', async () => {
-    const { calls } = await launch();
+  it('bootstraps once and guides the new project to text import', async () => {
+    const { user, calls } = await launch();
     expect(calls.filter(x => x.path === '/api/bootstrap')).toHaveLength(1);
     const create = calls.find(x => x.path === '/api/projects' && x.init?.method === 'POST')!;
     expect(new Headers(create.init!.headers).get('X-CSRF-TOKEN')).toBe('csrf');
     expect(new Headers(create.init!.headers).get('Idempotency-Key')).toBeTruthy();
     expect(new Headers(create.init!.headers).has('Origin')).toBe(false);
-    expect(screen.getByRole('button', { name: 'Озвучить выбранные фрагменты' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Обучить голос' })).toBeDisabled();
-    expect(await screen.findByText(/Движок озвучивания не настроен/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Озвучить выбранные фрагменты' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Обучить голос' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Добавить текст' }));
+    expect(screen.getByLabelText('Текст книги')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Дообучение' }));
+    expect(screen.queryByRole('heading', { name: 'Подготовка записи' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Добавить запись голоса' }));
+    expect(screen.getByLabelText('Запись голоса WAV')).toBeVisible();
   });
   it('renders a stable Russian error and never raw server detail', async () => {
     serve({ 'GET /api/bootstrap': { body: { code: 'session_required', detail: 'C:\\private\\secret' }, status: 401 } });
@@ -150,10 +190,11 @@ describe('Stage 1 project setup', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Откройте студию через ярлык');
     expect(screen.queryByText(/private/)).not.toBeInTheDocument();
   });
-  it('requires voice rights and explicitly explains Stage 1 WAV format before upload', async () => {
+  it('requires voice rights and explains the supported format when the decoder is absent', async () => {
     const { user, calls } = await launch(empty, { 'POST /api/projects/book1/voice/recording': { body: recording, etag: '"2"' } });
+    await user.click(screen.getByRole('button', { name: 'Голос' }));
     expect(screen.getByText(/PCM16, моно, 48 кГц/)).toBeInTheDocument();
-    expect(screen.getByText(/M4A и MP3/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Запись голоса WAV')).toHaveAttribute('accept', '.wav,audio/wav');
     await user.upload(screen.getByLabelText('Запись голоса WAV'), new File(['synthetic'], 'voice.wav', { type: 'audio/wav' }));
     expect(screen.getByRole('button', { name: 'Сохранить запись' })).toBeDisabled();
     await user.click(screen.getByLabelText(/мой голос/));
@@ -170,14 +211,16 @@ describe('Stage 1 project setup', () => {
   });
   it('offers paste or TXT input and displays original and normalized text distinctly', async () => {
     const { user } = await launch(empty, { 'POST /api/projects/book1/text/paste': { body: { ...text, textDocument: { ...text.textDocument, normalizedText: 'Ёжик. Мама.' } }, etag: '"2"' } });
+    await user.click(screen.getByRole('button', { name: 'Добавить текст' }));
     await user.click(screen.getByLabelText('Файл TXT'));
     expect(screen.getByLabelText('Текстовый файл TXT')).toBeInTheDocument();
     await user.click(screen.getByLabelText('Вставить текст'));
     await user.type(screen.getByLabelText('Текст книги'), source);
     await user.click(screen.getByRole('button', { name: 'Импортировать текст' }));
-    const original = await screen.findByRole('region', { name: 'Исходный текст' });
+    await user.click(await screen.findByText('Сверить с исходным текстом'));
+    const original = screen.getByRole('region', { name: 'Исходный текст' });
     expect(original.textContent).toBe(source);
-    expect(screen.getByRole('region', { name: 'Нормализованный текст' }).textContent).toBe('Ёжик. Мама.');
+    expect(screen.getByRole('region', { name: 'Текст после подготовки' }).textContent).toBe('Ёжик. Мама.');
   });
   it('saves spoken text with the latest ETag, then refreshes a stale snapshot without replaying', async () => {
     const changed = { ...text, revision: 3, segments: [{ ...text.segments[0], spokenText: 'Ёжик говорит.' }] };
@@ -185,32 +228,36 @@ describe('Stage 1 project setup', () => {
     const { user, calls } = await launch(text, { 'POST /api/projects': { body: text, etag: '"2"' }, 'PATCH /api/projects/book1/segments/segment1': [
       { body: changed, etag: '"3"' }, { body: { code: 'project.conflict', conflictType: 'project', detail: 'private', currentSnapshot: refreshed }, etag: '"4"', status: 412 }, { body: { ...refreshed, revision: 5 }, etag: '"5"' },
     ] });
-    let edit = screen.getByLabelText('Произносимый текст 1');
+    await user.click(screen.getByRole('button', { name: 'Тексты' }));
+    let edit = screen.getByLabelText('Текст фрагмента 1');
     await user.clear(edit); await user.type(edit, 'Ёжик говорит.');
     await user.click(screen.getByRole('button', { name: 'Сохранить фрагмент 1' }));
-    await waitFor(() => expect(screen.getByText('Версия 3')).toBeInTheDocument());
-    edit = screen.getByLabelText('Произносимый текст 1'); await user.clear(edit); await user.type(edit, 'Несохранённая правка');
+    await waitFor(() => expect(screen.getByTitle('Версия 3')).toBeInTheDocument());
+    edit = screen.getByLabelText('Текст фрагмента 1'); await user.clear(edit); await user.type(edit, 'Несохранённая правка');
     await user.click(screen.getByRole('button', { name: 'Сохранить фрагмент 1' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/из другой вкладки/);
-    expect(screen.getByLabelText('Произносимый текст 1')).toHaveValue('Текст из другой вкладки.');
+    expect(screen.getByLabelText('Текст фрагмента 1')).toHaveValue('Текст из другой вкладки.');
     expect(calls.filter(x => x.init?.method === 'PATCH').map(x => new Headers(x.init?.headers).get('If-Match'))).toEqual(['"2"', '"3"']);
-    edit = screen.getByLabelText('Произносимый текст 1'); await user.clear(edit); await user.type(edit, 'Следующая правка');
+    edit = screen.getByLabelText('Текст фрагмента 1'); await user.clear(edit); await user.type(edit, 'Следующая правка');
     await user.click(screen.getByRole('button', { name: 'Сохранить фрагмент 1' }));
-    await waitFor(() => expect(screen.getByText('Версия 5')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTitle('Версия 5')).toBeInTheDocument());
     expect(new Headers(calls.filter(x => x.init?.method === 'PATCH')[2].init?.headers).get('If-Match')).toBe('"4"');
   });
   it('reopens from the authoritative catalog snapshot after page reload', async () => {
     serve({ 'GET /api/bootstrap': { body: bootstrap }, 'GET /api/projects': { body: [{ id: 'book1', displayName: 'Моя книга', createdUtc: '2026-10-09T00:00:00Z', lastOpenedUtc: '2026-10-09T00:00:00Z', revision: 2, hasRecording: false, hasAnchor: false, hasText: true }] },
       'GET /api/projects/book1': { body: text, etag: '"2"' }, 'POST /api/projects/book1/open': { body: text, etag: '"2"' } });
     const user = userEvent.setup(); render(<App />);
-    await user.click(await screen.findByRole('button', { name: 'Продолжить «Моя книга»' }));
-    expect(await screen.findByLabelText('Произносимый текст 1')).toHaveValue(source);
+    await user.click(await screen.findByRole('button', { name: 'Открыть голос «Моя книга»' }));
+    await user.click(await screen.findByRole('button', { name: 'Тексты' }));
+    expect(await screen.findByLabelText('Текст фрагмента 1')).toHaveValue(source);
+    await user.click(screen.getByText('Сверить с исходным текстом'));
     expect(within(screen.getByRole('region', { name: 'Исходный текст' })).queryByText(source)).toBeInTheDocument();
   });
   it('explains legacy reimport requires a new project', async () => {
     const { user } = await launch(empty, { 'POST /api/projects/book1/text/paste': { body: { code: 'text.reimport_required' }, status: 409 } });
+    await user.click(screen.getByRole('button', { name: 'Добавить текст' }));
     await user.type(screen.getByLabelText('Текст книги'), source);
     await user.click(screen.getByRole('button', { name: 'Импортировать текст' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/новый проект/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Добавьте голос заново/);
   });
 });

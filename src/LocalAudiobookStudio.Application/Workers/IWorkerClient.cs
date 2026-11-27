@@ -18,6 +18,7 @@ public interface IRuntimeDescriptor { Task<RuntimeDescriptor> GetAsync(Cancellat
 /// <summary>App owns the process tree; transport may close it but cannot infer exit from a pipe ACK.</summary>
 public interface IWorkerSessionLifetime
 {
+    bool StopRequested => false;
     /// <summary>Best-effort stop is required even at zero budget. True means owned tree exit is proved.</summary>
     Task<bool> StopAsync(TimeSpan remaining, CancellationToken token);
 }

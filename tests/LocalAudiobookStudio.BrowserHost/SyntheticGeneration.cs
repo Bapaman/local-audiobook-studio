@@ -36,20 +36,19 @@ internal static class SyntheticGeneration
             try
             {
                 await Task.Delay(TimeSpan.FromSeconds(2), lifetime.Token);
-                // This scripted boundary double holds the first generation unit
-                // until durable Pause/Cancel. Tab close/reopen must not race a
-                // two-second fake completion on a slower machine. Preview and
-                // subsequent resumed units remain ordinary synthetic synthesis.
+                // Hold the first unit of a multi-fragment job until durable Pause/Cancel.
+                // This keeps tab reopening independent of timing. Single-fragment
+                // and resumed jobs complete normally.
                 while (true)
                 {
                     var current = (await jobs.ListAsync(projectId, lifetime.Token)).FirstOrDefault(x =>
                         x.State is JobState.Preparing or JobState.Running or JobState.PauseRequested or JobState.CancelRequested);
-                    if (current is not { Kind: JobKind.Generation, CompletedUnits: 0, RequestedState: JobRequestedState.Run }) break;
+                    if (current is not { Kind: JobKind.Generation, TotalUnits: > 1, CompletedUnits: 0, RequestedState: JobRequestedState.Run }) break;
                     await Task.Delay(TimeSpan.FromMilliseconds(50), lifetime.Token);
                 }
             }
             catch (OperationCanceledException) { throw new WorkerClientException("worker.canceled", true); }
-            byte[] bytes = Wave();
+            byte[] bytes = Wave(command.Text);
             await File.WriteAllBytesAsync(command.FinalPath + ".part", bytes, CancellationToken.None);
             File.Move(command.FinalPath + ".part", command.FinalPath);
             return new(command.FinalPath, bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)), 1, 48000, 16, 1,
@@ -57,14 +56,15 @@ internal static class SyntheticGeneration
         }
         public Task CancelAsync(string targetRequestId, CancellationToken token) { canceled.Cancel(); return Task.CompletedTask; }
         public ValueTask DisposeAsync() { canceled.Dispose(); return ValueTask.CompletedTask; }
-        private static byte[] Wave()
+        private static byte[] Wave(string text)
         {
             byte[] bytes = new byte[96044];
             using var stream = new MemoryStream(bytes); using var writer = new BinaryWriter(stream);
             writer.Write("RIFF"u8); writer.Write(bytes.Length - 8); writer.Write("WAVEfmt "u8); writer.Write(16);
             writer.Write((short)1); writer.Write((short)1); writer.Write(48000); writer.Write(96000); writer.Write((short)2); writer.Write((short)16);
             writer.Write("data"u8); writer.Write(96000);
-            for (int i = 0; i < 48000; i++) writer.Write((short)(1500 * Math.Sin(2 * Math.PI * 220 * i / 48000)));
+            int frequency = 220 + text.Sum(character => (int)character) % 120;
+            for (int i = 0; i < 48000; i++) writer.Write((short)(1500 * Math.Sin(2 * Math.PI * frequency * i / 48000)));
             return bytes;
         }
     }

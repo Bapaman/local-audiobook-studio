@@ -2,6 +2,7 @@ using System.Text;
 using LocalAudiobookStudio.Core.Projects;
 using LocalAudiobookStudio.Core.Storage;
 using LocalAudiobookStudio.Core.Text;
+using LocalAudiobookStudio.Core.Voices;
 
 namespace LocalAudiobookStudio.Core.Jobs;
 
@@ -23,7 +24,9 @@ internal static class JobValidation
     {
         Require(input != null && Id(input.ProjectId) && input.ProjectRevision >= 1 && input.Voice != null && input.Preset != null && input.Items != null, code);
         var voice = input.Voice; var preset = input.Preset;
-        Require(Id(voice.Id) && voice.WavRelativePath == $"voice-snapshot/{voice.Id}.wav" && !string.IsNullOrWhiteSpace(voice.Transcript) && ValidUtf8(voice.Transcript) && VoiceHash(voice.WavHash) && VoiceHash(voice.TranscriptHash) && VoiceHash(voice.IdentityHash) && voice.RightsConfirmed && voice.ImportedUtc.Offset == TimeSpan.Zero && voice.StartMilliseconds is >= 0 && voice.EndMilliseconds is { } end && end - voice.StartMilliseconds is >= 10000 and <= 20000, code);
+        Require(Id(voice.Id) && voice.WavRelativePath == $"voice-snapshot/{voice.Id}.wav" && !string.IsNullOrWhiteSpace(voice.Transcript) && ValidUtf8(voice.Transcript) && VoiceHash(voice.WavHash) && VoiceHash(voice.TranscriptHash) && VoiceHash(voice.IdentityHash) && voice.RightsConfirmed && voice.ImportedUtc.Offset == TimeSpan.Zero, code);
+        Require(db.State.VoiceRecording is { } recording && voice.StartMilliseconds is { } start && voice.EndMilliseconds is { } end &&
+            VoiceRecordingPolicy.IsAnchorRangeValid(recording.SampleCount, start, end), code);
         db.ResolveOwnedPath(voice.WavRelativePath);
         Require(input.SavedVoice == null || input.SavedVoxCpmVoice == null, code);
         if (input.SavedVoxCpmVoice is { } vox)
@@ -48,7 +51,8 @@ internal static class JobValidation
         }
         bool configured = input.SavedVoxCpmVoice?.Options != null;
         bool providerPreset = input.SavedVoxCpmVoice == null
-            ? preset.Id == "voxcpm2-local-v1" && preset.ProfileId is "q8-f16-cpu" or "q8-f16-hybrid-16" && preset.Steps == 70
+            ? preset.ProfileId is ("q8-f16-cpu" or "q8-f16-hybrid-16")
+                && preset is ({ Id: "voxcpm2-local-v1", Steps: 70 } or { Id: GenerationPreset.VoxCpmLocalId, Steps: GenerationPreset.VoxCpmLocalDecodeSteps })
             : preset.Id == (configured ? "voxcpm2-saved-adapter-controls-v1" : input.SavedVoxCpmVoice.Reference == null ? "voxcpm2-saved-adapter-v1" : "voxcpm2-saved-adapter-reference-v1")
                 && preset.ProfileId == input.SavedVoxCpmVoice.ProfileVersion && preset.Steps == 256 && !preset.AllowCpuFallback;
         var options = input.SavedVoxCpmVoice?.Options;
@@ -98,7 +102,7 @@ internal static class JobValidation
     private static bool Phase(string? phase) => phase is "queued" or "preparing" or "validating_inputs" or "generating" or "validating_output" or "publishing" or "retrying_cpu" or "paused" or "interrupted" or "canceled" or "failed" or "completed";
     private static bool Code(string? code) => code is null or "worker.canceled" or "worker.timeout" or "worker.crash" or "worker.cuda.oom"
         or "worker.memory.insufficient" or "worker.memory.reserve" or "worker.memory.policy"
-        or "worker.output.invalid" or "worker.output.missing" or "worker.output.exists" or "worker.arguments" or "worker.path"
+        or "worker.output.invalid" or "worker.output.missing" or "worker.output.exists" or "worker.output.limit" or "worker.arguments" or "worker.path"
         or "worker.artifacts" or "worker.developer.required" or "worker.profile" or "worker.storage" or "worker.cleanup"
         or "worker.launch" or "worker.unsupported.platform" or "worker.configuration" or "worker.internal"
         or "worker.authentication" or "worker.busy" or "protocol.command" or "protocol.payload" or "protocol.frame"

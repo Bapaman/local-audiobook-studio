@@ -189,14 +189,16 @@ it('retains captured history/audio after refresh and reuses captured options/mod
     createdUtc: '', updatedUtc: '', completedUtc: '', diagnosticCode: null, inputHash: 'hash', effectiveProfileId: 'voxcpm2-saved-adapter-controls-cpu-v1',
     voxCpmGeneration: { modelId: model, globalStep: 29, options: captured, referenceClipId: clip, referenceTrainingOrdinal: 0, referenceSeconds: 12 },
     audioResults: [{ segmentId: 's1', order: 0, artifactId: 'audio1', seconds: 4.2, spokenText: 'Исторический текст.' }] }];
+  state.jobs.unshift(successfulJob({ kind: 'generation', createdUtc: '2026-10-10T00:00:00Z' }));
   const view = render(<GenerationPanel current={current} generation={state} busy={false} voxTraining={vox} />);
-  const history = screen.getByRole('article', { name: 'Пробное задание' });
+  const user = userEvent.setup();
+  await user.click(screen.getByText('История заданий', { exact: true }));
+  const history = await screen.findByRole('article', { name: 'Пробное задание' });
   expect(within(history).getByText(/Seed: 99/)).toHaveTextContent(/85%/);
   expect(within(history).getByLabelText('Аудио результата 1')).toHaveAttribute('src', '/api/projects/book1/artifacts/audio1');
   expect(within(history).getByRole('link', { name: /Скачать WAV/ })).toHaveAttribute('href', '/api/projects/book1/artifacts/audio1');
-  expect(screen.getByText(/последние 32 завершённых задания/)).toBeInTheDocument();
   expect(within(history).getByText(/первые 32/)).toBeInTheDocument();
-  const user = userEvent.setup(); await user.click(within(history).getByRole('button', { name: 'Использовать эти настройки' }));
+  await user.click(within(history).getByRole('button', { name: 'Использовать эти настройки' }));
   expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue(`voxcpm:${model}`);
   expect(screen.getByLabelText('Seed — вариация')).toHaveValue(99);
   expect(screen.getByLabelText(/Подтверждаю экспериментальное применение/)).not.toBeChecked();

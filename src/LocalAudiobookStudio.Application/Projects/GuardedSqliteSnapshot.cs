@@ -19,7 +19,7 @@ internal sealed class GuardedSqliteSnapshot : IDisposable
         Database = Path.Combine(directory, "snapshot.sqlite");
     }
 
-    public static GuardedSqliteSnapshot Create(CatalogPaths paths, string sourceDatabase, CancellationToken token)
+    public static GuardedSqliteSnapshot Create(CatalogPaths paths, string sourceDatabase, CancellationToken token, bool reportSharingContention = false)
     {
         var snapshot = new GuardedSqliteSnapshot(paths);
         try
@@ -40,7 +40,7 @@ internal sealed class GuardedSqliteSnapshot : IDisposable
                     try { File.GetAttributes(path); }
                     catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
                     { if (suffix.Length == 0) throw new StudioException("project.unavailable"); else continue; }
-                    sources.Add((suffix, new FileStream(CatalogPaths.OpenFile(path, 0x80000000, 1, 3), FileAccess.Read)));
+                    sources.Add((suffix, new FileStream(CatalogPaths.OpenFile(path, 0x80000000, 1, 3, reportSharingContention), FileAccess.Read)));
                 }
                 Directory.CreateDirectory(snapshot.directory);
                 CatalogPaths.PinDirectories(snapshot.directory, snapshot.directoryPins);

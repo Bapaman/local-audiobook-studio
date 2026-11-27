@@ -218,11 +218,16 @@ internal sealed class CatalogPaths
         pins.Add(OpenFile(path, metadataOnly ? 0x80u : 0x80000000u, 3, 3));
     }
 
-    internal static SafeFileHandle OpenFile(string path, uint access, uint share, uint disposition)
+    internal static SafeFileHandle OpenFile(string path, uint access, uint share, uint disposition, bool reportSharingContention = false)
     {
         RejectReparse(path);
         var handle = CreateFileW(SqlitePath(path), access, share, 0, disposition, 0x00200000, 0);
-        try { ValidateHandle(handle, directory: false); return handle; }
+        try
+        {
+            if (reportSharingContention && handle.IsInvalid && Marshal.GetLastPInvokeError() == 32)
+                throw new StudioException("catalog.snapshot.busy");
+            ValidateHandle(handle, directory: false); return handle;
+        }
         catch { handle.Dispose(); throw; }
     }
 

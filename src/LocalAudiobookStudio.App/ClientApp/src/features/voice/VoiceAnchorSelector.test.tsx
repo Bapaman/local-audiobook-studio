@@ -3,6 +3,18 @@ import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { VoiceAnchorSelector } from './VoiceAnchorSelector';
 
+it('lets a five-second recording be confirmed in full', async () => {
+  const confirm = vi.fn();
+  const user = userEvent.setup();
+  render(<VoiceAnchorSelector durationMilliseconds={5000} mediaUrl="/voice.wav" busy={false} onConfirm={confirm} />);
+  await user.type(screen.getByLabelText('Точный текст фрагмента'), 'Первая история.');
+  const save = screen.getByRole('button', { name: 'Подтвердить голосовой фрагмент' });
+  expect(save).toBeDisabled();
+  await user.click(screen.getByLabelText('Прослушал и подтверждаю'));
+  await user.click(save);
+  expect(confirm).toHaveBeenCalledExactlyOnceWith({ startMilliseconds: 0, endMilliseconds: 5000, transcript: 'Первая история.', pairListenedAndConfirmed: true });
+});
+
 it('validates 10–20 seconds, seeks native audio, and resets explicit confirmation on range changes', async () => {
   const confirm = vi.fn(); const user = userEvent.setup();
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();

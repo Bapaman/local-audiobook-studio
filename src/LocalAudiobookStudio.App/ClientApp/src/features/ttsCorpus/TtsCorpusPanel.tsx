@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ApiError, type StudioClient } from '../../api/client';
 import type { SnapshotResponse, TtsCorpusClip, TtsCorpusState, TtsCorpusVersion } from '../../api/types';
-import { useTtsCorpus } from './useTtsCorpus';
+import { corpusCheckingResume, useTtsCorpus } from './useTtsCorpus';
 
 const states: Record<TtsCorpusState, string> = { queued: 'В очереди', preparing: 'Разделение записи', transcribing: 'Распознавание речи', stop_requested: 'Остановка запрошена', paused: 'Остановлено', completed: 'Черновик подготовлен', interrupted: 'Прервано при закрытии студии', failed: 'Подготовка остановлена с ошибкой' };
-const phases: Record<string, string> = { queued: 'Ожидание вычислений', preparing: 'Разделение по паузам', prepare: 'Разделение по паузам', transcribing: 'Локальное распознавание', completed: 'Готов к проверке', paused: 'Остановлено' };
+const phases: Record<string, string> = { queued: 'Ожидание вычислений', preparing: 'Разделение по паузам', prepare: 'Разделение по паузам', transcribing: 'Локальное распознавание', completed: 'Готов к проверке', paused: 'Остановлено', interrupted: 'Прервано' };
 const safeCode = (code: string | null | undefined) => code && /^tts_corpus\.[a-zA-Z0-9_.-]{1,90}$/.test(code) ? code : null;
 const duration = (seconds: number) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(seconds)} с`;
 const validText = (text: string) => { const normalized = text.trim().replace(/\s+/g, ' '); return normalized.length > 0 && normalized.length <= 4000; };
@@ -14,40 +14,47 @@ const bufferFor = (clip: TtsCorpusClip): Buffer => ({ text: clip.text, excluded:
 export function TtsCorpusPanel({ current, busy, onActiveChange, client, installProject, onVersionsChange }: { current: SnapshotResponse; busy: boolean; onActiveChange: (active: boolean) => void; client?: StudioClient; installProject?: (value: SnapshotResponse) => void; onVersionsChange?: (versions: TtsCorpusVersion[]) => void }) {
   const state = useTtsCorpus(current, client, installProject);
   const [experimental, setExperimental] = useState(false);
+  const [checkingEngine, setCheckingEngine] = useState(false);
   const snapshot = state.corpus?.snapshot;
+  const checkingResume = corpusCheckingResume(state.corpus);
   useEffect(() => { onVersionsChange?.(snapshot?.versions ?? []); }, [snapshot?.versions, onVersionsChange]);
   useEffect(() => { onActiveChange(state.active || state.pending); }, [state.active, state.pending, onActiveChange]);
   useEffect(() => () => onActiveChange(false), [onActiveChange]);
   const disabled = busy || state.loading || state.pending;
   const sourceMatches = !!snapshot && snapshot.sourceRecordingId === current.snapshot.voiceRecording?.artifactId;
-  const canResume = sourceMatches && snapshot?.canResume === true && ['paused', 'interrupted', 'failed'].includes(snapshot.state);
-  const canStartFresh = sourceMatches && snapshot?.canResume === false && ['paused', 'interrupted', 'failed'].includes(snapshot.state);
-  return <section className="panel training-panel" aria-labelledby="tts-corpus-heading">
-    <div className="section-heading"><div><p className="eyebrow">ПОДГОТОВКА ДАННЫХ · ЭКСПЕРИМЕНТ</p><h2 id="tts-corpus-heading">Корпус речи для VoxCPM2</h2></div><span className="state-badge">CPU · 2 потока</span></div>
-    <p>Корпус — это короткие аудиоклипы с точным текстом. Это ещё не обученная голосовая модель. После их проверки и подтверждения версии можно запустить раздел «Дообучение VoxCPM2». Применение дообученной модели к озвучиванию подключается отдельно.</p>
-    {!state.readiness ? <p role="status">Проверяем локальное распознавание…</p> : !state.readiness.ready ? <p className="notice warning">Локальное распознавание не готово. {new ApiError('tts_corpus.runtime.not_ready').message}{safeCode(state.readiness.diagnosticCode) && <> Диагностика: <code>{safeCode(state.readiness.diagnosticCode)}</code>.</>}</p> : <p className="subtle">Локальное распознавание готово. Запись обрабатывается на этом компьютере.</p>}
-    {!current.snapshot.voiceRecording && <p className="notice warning">Сначала сохраните исходную запись голоса в этом проекте.</p>}
+  const canResume = !checkingResume && sourceMatches && snapshot?.canResume === true && ['paused', 'interrupted', 'failed'].includes(snapshot.state);
+  const canStartFresh = !checkingResume && sourceMatches && snapshot?.canResume === false && ['paused', 'interrupted', 'failed'].includes(snapshot.state);
+  async function prepare(run: () => Promise<unknown>) {
+    setCheckingEngine(true);
+    try { await run(); } finally { setCheckingEngine(false); }
+  }
+  return <section className="panel training-panel" aria-labelledby="tts-corpus-heading" hidden={!current.snapshot.voiceRecording && !snapshot}>
+    <h2 id="tts-corpus-heading">Подготовка записи</h2>
+    {!snapshot && <p>Студия разделит запись на фрагменты и распознает речь. Проверьте распознанный текст, чтобы перейти к дообучению.</p>}
+    {state.loading && <p role="status">Загружаем состояние записи…</p>}
+    {checkingEngine && <p className="training-check" role="status">Проверяем файлы распознавания перед запуском. Это может занять пару минут.</p>}
+    {!current.snapshot.voiceRecording && <p className="notice warning">Сначала сохраните исходную запись в разделе «Голос».</p>}
     <label className="check-label"><input type="checkbox" checked={experimental} disabled={disabled || state.active} onChange={event => setExperimental(event.target.checked)} />Подтверждаю экспериментальную подготовку: распознанный текст и границы клипов нужно проверить на слух.</label>
-    {!snapshot && <button className="primary" disabled={disabled || !state.readiness?.ready || !experimental || !current.snapshot.voiceRecording} onClick={() => void state.start()}>Подготовить запись для обучения VoxCPM2</button>}
+    {!snapshot && <button className="primary" disabled={disabled || !experimental || !current.snapshot.voiceRecording} onClick={() => void prepare(state.start)}>Подготовить запись для обучения VoxCPM2</button>}
     {snapshot && <>
       <article className="training-progress" aria-label="Прогресс подготовки корпуса">
         <div className="section-heading"><h3>{states[snapshot.state] ?? 'Состояние корпуса обновляется'}</h3><span className="state-badge">{phases[snapshot.phase] ?? 'Локальная обработка'}</span></div>
         <p>Готовые клипы: {snapshot.completedClipCount}{snapshot.totalClipCount === null ? ' · общее число пока неизвестно' : ` из ${snapshot.totalClipCount}`}</p>
         <p>Сохранённая длительность: {duration(snapshot.retainedDurationSeconds)} · только включённые принятые клипы.</p>
         <p className="subtle">Исходная запись: {duration(snapshot.sourceDurationSeconds)}. Длительность обновится после сохранения исключений.</p>
-        {safeCode(snapshot.diagnosticCode) && <p className="notice warning">{new ApiError(snapshot.diagnosticCode!).message} Диагностика: <code>{safeCode(snapshot.diagnosticCode)}</code></p>}
+        {checkingResume && <p className="training-check" role="status">Проверяем, можно ли продолжить подготовку записи.</p>}
+        {!checkingResume && safeCode(snapshot.diagnosticCode) && <p className="notice warning">{new ApiError(snapshot.diagnosticCode!).message} Диагностика: <code>{safeCode(snapshot.diagnosticCode)}</code></p>}
         {state.active ? <><button disabled={state.pending || snapshot.state === 'stop_requested'} onClick={() => void state.control('stop')}>Остановить подготовку</button><p className="subtle">Остановка выполняется после текущего клипа. Закрытие вкладки не отменяет подготовку, пока работает студия.</p></> : <>
-          <button disabled={disabled || !state.readiness?.ready || !experimental || !canResume} onClick={() => void state.control('resume')}>Продолжить подготовку</button>
-          {!canResume && snapshot.state !== 'completed' && <p className="subtle">Продолжение недоступно: нужны та же запись, план и локальный движок. Сохранённые клипы можно проверить.</p>}
-          {canStartFresh && <><p className="subtle">При новой подготовке неподтверждённый черновик будет заменён. Подтверждённые версии сохранятся.</p><button disabled={disabled || !state.readiness?.ready || !experimental} onClick={() => void state.start()}>Начать подготовку заново</button></>}
+          <button disabled={disabled || !experimental || !canResume} onClick={() => void prepare(() => state.control('resume'))}>Продолжить подготовку</button>
+          {!checkingResume && !canResume && snapshot.state !== 'completed' && <p className="subtle">Продолжение недоступно: нужны та же запись, план и локальный движок. Сохранённые клипы можно проверить.</p>}
+          {canStartFresh && <><p className="subtle">При новой подготовке неподтверждённый черновик будет заменён. Подтверждённые версии сохранятся.</p><button disabled={disabled || !experimental} onClick={() => void prepare(state.start)}>Начать подготовку заново</button></>}
         </>}
       </article>
       {!sourceMatches && <p className="notice warning">Корпус относится к другой исходной записи. Правки и подтверждение недоступны.</p>}
       <CorpusEditor key={snapshot.id} snapshot={snapshot} state={state} disabled={disabled || state.active || !sourceMatches} />
-      {snapshot.versions.length > 0 && <div className="training-versions"><h3>Подтверждённые версии корпуса</h3><p className="subtle">Эти версии неизменяемы. Правки черновика не изменяют уже подтверждённый текст и звук.</p><ol>{snapshot.versions.map((version, index) => <li key={version.id}><strong>Версия корпуса {index + 1}</strong> · клипов: {version.clipCount} · {duration(version.retainedDurationSeconds)}<p><time dateTime={version.createdUtc}>{new Date(version.createdUtc).toLocaleString('ru-RU')}</time></p><p className="subtle">SHA-256: <code className="corpus-hash">{version.sha256}</code></p></li>)}</ol></div>}
+      {snapshot.versions.length > 0 && <details className="training-versions workspace-extra"><summary>Подтверждённые версии записи ({snapshot.versions.length})</summary><ol>{snapshot.versions.map((version, index) => <li key={version.id}><strong>Версия корпуса {index + 1}</strong> · клипов: {version.clipCount} · {duration(version.retainedDurationSeconds)}<p><time dateTime={version.createdUtc}>{new Date(version.createdUtc).toLocaleString('ru-RU')}</time></p><p className="subtle">SHA-256: <code className="corpus-hash">{version.sha256}</code></p></li>)}</ol></details>}
     </>}
     {state.error && <p className="notice error" role="alert">{state.error}</p>}
-    <p className="subtle">После перезапуска прерванная подготовка продолжится только по вашей команде.</p>
   </section>;
 }
 

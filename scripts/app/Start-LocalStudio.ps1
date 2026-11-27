@@ -9,6 +9,7 @@ param(
     [string]$TrainingRuntimeConfig,
     [string]$TtsCorpusRuntimeConfig,
     [string]$VoxCpmTrainingRuntimeConfig,
+    [string]$VoiceFfmpeg,
     [switch]$SkipBuild
 )
 Set-StrictMode -Version Latest
@@ -16,6 +17,13 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $project = Join-Path $repositoryRoot 'src\LocalAudiobookStudio.App\LocalAudiobookStudio.App.csproj'
 $launchArguments = @()
+if ($VoiceFfmpeg) {
+    if ($VoiceFfmpeg -notmatch '^[A-Za-z]:[\\/]' -or $VoiceFfmpeg.Contains('"') -or $VoiceFfmpeg -match '[\x00-\x1f]') {
+        throw 'VoiceFfmpeg must be an absolute local path.'
+    }
+    if (-not (Test-Path -LiteralPath $VoiceFfmpeg -PathType Leaf)) { throw 'FFmpeg executable is missing.' }
+    $VoiceFfmpeg = (Resolve-Path -LiteralPath $VoiceFfmpeg).Path
+}
 if ($VoxCpmTrainingRuntimeConfig) {
     if ($VoxCpmTrainingRuntimeConfig -notmatch '^[A-Za-z]:[\\/]' -or $VoxCpmTrainingRuntimeConfig.Contains('"') -or $VoxCpmTrainingRuntimeConfig -match '[\x00-\x1f]') {
         throw 'VoxCpmTrainingRuntimeConfig must be an absolute local path.'
@@ -64,6 +72,7 @@ if ($providedRoots.Count -ne 0) {
 if ($TrainingRuntimeConfig) { $launchArguments += @('--training-runtime-config', ('"' + $TrainingRuntimeConfig + '"')) }
 if ($TtsCorpusRuntimeConfig) { $launchArguments += @('--tts-corpus-runtime-config', ('"' + $TtsCorpusRuntimeConfig + '"')) }
 if ($VoxCpmTrainingRuntimeConfig) { $launchArguments += @('--voxcpm-training-runtime-config', ('"' + $VoxCpmTrainingRuntimeConfig + '"')) }
+if ($VoiceFfmpeg) { $launchArguments += @('--voice-ffmpeg', ('"' + $VoiceFfmpeg + '"')) }
 Push-Location -LiteralPath $repositoryRoot
 try {
     if (-not $SkipBuild) {

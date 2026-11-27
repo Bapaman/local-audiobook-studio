@@ -3,11 +3,77 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using LocalAudiobookStudio.Application.Voices;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LocalAudiobookStudio.Web.Tests;
 
 public sealed class UploadApiTests
 {
+    [Theory]
+    [InlineData("recording.ogg", VoiceMessageFormat.Ogg)]
+    [InlineData("recording.OGA", VoiceMessageFormat.Ogg)]
+    [InlineData("recording.opus", VoiceMessageFormat.Ogg)]
+    [InlineData("recording.m4a", VoiceMessageFormat.M4a)]
+    [InlineData("recording.mp3", VoiceMessageFormat.Mp3)]
+    public async Task Configured_decoder_accepts_voice_message_as_the_normal_project_recording(string fileName, VoiceMessageFormat format)
+    {
+        byte[] wav = ApiTestHost.Wav();
+        var decoder = new VoiceMessageDecoder(wav);
+        await using var host = await ApiTestHost.StartAsync(configureServices: services => services.AddSingleton<IVoiceRecordingDecoder>(decoder));
+        var project = await host.CreateAsync();
+        using var bootstrap = await host.SendAsync(HttpMethod.Get, "/api/bootstrap");
+        Assert.True((await ApiTestHost.JsonAsync(bootstrap)).GetProperty("capabilities").GetProperty("voiceMessages").GetBoolean());
+        var route = $"/api/projects/{project.Id}/voice/recording";
+        using var denied = await host.SendAsync(HttpMethod.Post, route,
+            ApiTestHost.Multipart([1, 3, 5], $$"""{"fileName":"{{fileName}}","rightsConfirmed":false}"""), project.ETag);
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        Assert.Null(decoder.Source);
+        using var upload = await host.SendAsync(HttpMethod.Post, route,
+            ApiTestHost.Multipart([1, 3, 5], $$"""{"fileName":"{{fileName}}","rightsConfirmed":true}"""), project.ETag);
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        Assert.Equal([1, 3, 5], decoder.Source);
+        Assert.Equal(format, decoder.Format);
+        var id = (await ApiTestHost.JsonAsync(upload)).GetProperty("voiceRecording").GetProperty("artifactId").GetString();
+        using var accepted = await host.SendAsync(HttpMethod.Get, $"/api/projects/{project.Id}/artifacts/{id}");
+        Assert.Equal(wav, await accepted.Content.ReadAsByteArrayAsync(ApiTestHost.Token));
+        using var duplicate = await host.SendAsync(HttpMethod.Post, route,
+            ApiTestHost.Multipart([2, 4], $$"""{"fileName":"{{fileName}}","rightsConfirmed":true}"""), upload.Headers.ETag!.Tag);
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+        Assert.Equal("voice.recording.exists", (await ApiTestHost.JsonAsync(duplicate)).GetProperty("code").GetString());
+        Assert.Equal([1, 3, 5], decoder.Source);
+        host.AssertNoParts();
+    }
+
+    [Fact]
+    public async Task Voice_message_without_decoder_returns_an_explicit_error_without_acceptance()
+    {
+        await using var host = await ApiTestHost.StartAsync();
+        var project = await host.CreateAsync();
+        var route = $"/api/projects/{project.Id}/voice/recording";
+        using var response = await host.SendAsync(HttpMethod.Post, route,
+            ApiTestHost.Multipart([1], """{"fileName":"recording.ogg","rightsConfirmed":true}"""), project.ETag);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("voice.decoder.unavailable", (await ApiTestHost.JsonAsync(response)).GetProperty("code").GetString());
+        host.AssertNoParts();
+    }
+
+    private sealed class VoiceMessageDecoder(byte[] wav) : IVoiceRecordingDecoder
+    {
+        public byte[]? Source { get; private set; }
+        public VoiceMessageFormat Format { get; private set; }
+
+        public async Task<Stream> DecodeAsync(Stream content, VoiceMessageFormat format, CancellationToken token)
+        {
+            using var bytes = new MemoryStream();
+            await content.CopyToAsync(bytes, token);
+            Source = bytes.ToArray();
+            Format = format;
+            return new MemoryStream(wav);
+        }
+    }
+
     [Fact]
     public async Task Accepted_recording_anchor_and_opaque_range_read_work()
     {
@@ -80,6 +146,81 @@ public sealed class UploadApiTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var valid = await host.SendAsync(HttpMethod.Post, $"/api/projects/{project.Id}/text/file", ApiTestHost.Multipart(Encoding.UTF8.GetBytes("Привет."), "{\"displayName\":\"Text\"}"), project.ETag);
         Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("utf-8", false)]
+    [InlineData("utf-8", true)]
+    [InlineData("utf-16LE", true)]
+    [InlineData("utf-16BE", true)]
+    public async Task Book_file_import_keeps_exact_order_text_and_source_bytes_of_each_chapter(string encodingName, bool withBom)
+    {
+        await using var host = await ApiTestHost.StartAsync();
+        var project = await host.CreateAsync();
+        string route = $"/api/projects/{project.Id}";
+        string[] titles = ["Вступление", "Глава 1. Фонарь⁄Ночь", "Глава IV — Часы⧵Музей"];
+        string[] sources = ["История про Лиду.\r\n\r\n", "  Глава\u00a01. Фонарь/Ночь\rЛида взяла фонарь.\rВ этой главе 2 события.\u2028", "Глава\u202fIV — Часы\\Музей\u2029Засветилось окно ✨."];
+        var encoding = Encoding.GetEncoding(encodingName);
+        byte[][] bytes = sources.Select(encoding.GetBytes).ToArray();
+        if (withBom) bytes[0] = [.. encoding.GetPreamble(), .. bytes[0]];
+        using var response = await host.SendAsync(HttpMethod.Post, route + "/text/file",
+            ApiTestHost.Multipart(bytes.SelectMany(chunk => chunk).ToArray(), """{"displayName":"Книга.txt","splitChapters":true}"""), project.ETag);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await ApiTestHost.JsonAsync(response);
+        var chapters = result.GetProperty("textDocuments").EnumerateArray().ToArray();
+        Assert.Equal(3, chapters.Length);
+        for (int i = 0; i < chapters.Length; i++)
+        {
+            var chapter = chapters[i];
+            var document = chapter.GetProperty("document");
+            Assert.Equal(i, chapter.GetProperty("order").GetInt32());
+            Assert.Equal(titles[i], document.GetProperty("displayName").GetString());
+            Assert.Equal(sources[i], document.GetProperty("originalText").GetString());
+            Assert.Equal("File", document.GetProperty("sourceKind").GetString());
+            Assert.Equal(encodingName.ToLowerInvariant(), document.GetProperty("encoding").GetString());
+            Assert.Equal(bytes[i].Length, document.GetProperty("byteCount").GetInt64());
+            Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(bytes[i])), document.GetProperty("sha256").GetString());
+        }
+        var chapterSegments = chapters.SelectMany(chapter => chapter.GetProperty("segmentIds").EnumerateArray()).Select(id => id.GetString());
+        Assert.Equal(result.GetProperty("segments").EnumerateArray().Select(segment => segment.GetProperty("id").GetString()), chapterSegments);
+        using var reopened = await host.SendAsync(HttpMethod.Get, route);
+        Assert.Equal(response.Headers.ETag, reopened.Headers.ETag);
+        Assert.Equal(titles, (await ApiTestHost.JsonAsync(reopened)).GetProperty("textDocuments").EnumerateArray()
+            .Select(chapter => chapter.GetProperty("document").GetProperty("displayName").GetString()));
+    }
+
+    [Theory]
+    [InlineData("sparse", 400, "text.chapters.not_found")]
+    [InlineData("empty", 400, "text.chapters.empty")]
+    [InlineData("limit", 413, "text.project_limit")]
+    [InlineData("invalid_word", 400, "text.token_too_long")]
+    public async Task Rejected_book_split_leaves_project_empty_and_regular_import_still_works(string example, int status, string code)
+    {
+        await using var host = await ApiTestHost.StartAsync();
+        var project = await host.CreateAsync();
+        string route = $"/api/projects/{project.Id}";
+        string source = example switch
+        {
+            "sparse" => "Глава 1\nПервый текст.\nГлава 2 упоминается в середине книги.",
+            "empty" => "Глава 1\n\nГлава 2\nПервый текст.",
+            "limit" => string.Join("\n", Enumerable.Range(1, 33).Select(i => $"Глава {i}\nТекст главы.")),
+            _ => "Глава 1\nПервый текст.\nГлава 2\n" + new string('я', 321)
+        };
+        using var rejected = await host.SendAsync(HttpMethod.Post, route + "/text/file",
+            ApiTestHost.Multipart(Encoding.UTF8.GetBytes(source), """{"displayName":"Книга.txt","splitChapters":true}"""), project.ETag);
+        Assert.Equal(status, (int)rejected.StatusCode);
+        Assert.Equal(code, (await ApiTestHost.JsonAsync(rejected)).GetProperty("code").GetString());
+        using var snapshot = await host.SendAsync(HttpMethod.Get, route);
+        Assert.Equal(project.ETag, snapshot.Headers.ETag!.Tag);
+        var empty = await ApiTestHost.JsonAsync(snapshot);
+        Assert.False(empty.GetProperty("hasAcceptedText").GetBoolean());
+        Assert.Empty(empty.GetProperty("segments").EnumerateArray());
+
+        const string regularText = "Глава 1\nПервый текст.\nГлава 2\nПоследний текст.";
+        using var accepted = await host.SendAsync(HttpMethod.Post, route + "/text/file",
+            ApiTestHost.Multipart(Encoding.UTF8.GetBytes(regularText), """{"displayName":"Книга.txt"}"""), project.ETag);
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        Assert.Equal(regularText, (await ApiTestHost.JsonAsync(accepted)).GetProperty("textDocument").GetProperty("originalText").GetString());
     }
 
     [Theory]

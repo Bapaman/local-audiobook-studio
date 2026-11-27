@@ -10,6 +10,8 @@ namespace LocalAudiobookStudio.Application.TtsCorpus;
 /// <summary>Explicit queued dispatch; accepted windows survive stop and restart. Unknown child cleanup retains all ownership.</summary>
 public sealed class TtsCorpusRunner(ProjectJobAccess access, ComputeGate compute, ITtsCorpusRuntime runtime, ITtsCorpusExecutor executor)
 {
+    private const string Interrupted = "tts_corpus.interrupted";
+    private const string CheckingResume = "tts_corpus.interrupted.checking";
     private readonly SemaphoreSlim dispatch = new(1, 1);
     private readonly object sync = new();
     private Task<bool>? active;
@@ -18,35 +20,63 @@ public sealed class TtsCorpusRunner(ProjectJobAccess access, ComputeGate compute
     private volatile bool cleanupFault;
     private object? retained;
 
-    public async Task RecoverAsync(CancellationToken token)
+    // Clear old active state before accepting HTTP requests or dispatching the queue.
+    public async Task<IReadOnlyList<string>> InterruptOnStartupAsync(CancellationToken token)
     {
+        var toVerify = new List<string>();
         foreach (string id in await access.RegisteredIdsAsync(token))
         {
             if (!await access.HasTtsCorpusStateAsync(id, token)) continue;
             await using var session = await access.OpenCurrentAsync(id, token);
-            var db = session.Project; var store = StudioTtsCorpusService.Store(db);
+            var store = StudioTtsCorpusService.Store(session.Project);
+            bool verify = await store.TransactionAsync(e =>
+            {
+                if (e.Current is not { } current) return ((TtsCorpusEnvelope?)null, false);
+                if (!TtsCorpusRecordStore.Active(current.Snapshot.State))
+                    return ((TtsCorpusEnvelope?)null, TtsCorpusRecordStore.CanResume(current));
+                var interrupted = current with { StopRequested = false, Snapshot = current.Snapshot with
+                {
+                    State = "interrupted", Phase = "interrupted", CanResume = false, DiagnosticCode = Interrupted
+                } };
+                bool canCheck = TtsCorpusRecordStore.CanResume(interrupted);
+                if (canCheck) interrupted = interrupted with { Snapshot = interrupted.Snapshot with { DiagnosticCode = CheckingResume } };
+                return (e with { Current = Change(current, interrupted) }, canCheck);
+            }, token);
+            if (verify) toVerify.Add(id);
+        }
+        return toVerify;
+    }
+
+    public async Task VerifyResumeOnStartupAsync(IReadOnlyList<string> projectIds, CancellationToken token)
+    {
+        foreach (string id in projectIds)
+        {
+            token.ThrowIfCancellationRequested();
+            await using var session = await access.OpenCurrentAsync(id, token);
+            var store = StudioTtsCorpusService.Store(session.Project);
             var observed = await Read(store, token);
-            if (observed == null) continue;
-            bool wasActive = TtsCorpusRecordStore.Active(observed.Snapshot.State);
-            if (!wasActive && !TtsCorpusRecordStore.CanResume(observed)) continue;
+            if (observed == null || !TtsCorpusRecordStore.CanResume(observed)) continue;
             bool resumable = false;
             try
             {
-                await using var lease = await db.AcquireArtifactLeaseAsync(TimeSpan.FromMilliseconds(250), token);
-                await lease.RefreshAsync(token); await lease.RequireNoActiveJobsAsync(token);
-                using var source = await TtsCorpusSource.VerifyAsync(db, observed.Recording, token);
+                // This check only informs the UI. Resume and dispatch still validate under ownership.
                 await ValidateRuntime(observed, token);
-                if (observed.Plan != null) await VerifyPlanAndPayloads(db, observed, token);
-                resumable = TtsCorpusRecordStore.CanResume(observed with { Snapshot = observed.Snapshot with { State = "interrupted" } });
+                await using var current = await access.OpenCurrentAsync(id, token);
+                using var source = await TtsCorpusSource.VerifyAsync(current.Project, observed.Recording, token);
+                if (observed.Plan != null) await VerifyPlanAndPayloads(current.Project, observed, token);
+                resumable = true;
             }
             catch (Exception e) when (SafeFailure(e)) { /* Invalid inputs cannot be reused; the interrupted draft remains readable. */ }
-            await Update(store, observed, r =>
+            await store.TransactionAsync(e =>
             {
-                if (!wasActive) return r.Snapshot.CanResume == resumable ? r : r with { Snapshot = r.Snapshot with { CanResume = resumable } };
-                if (!TtsCorpusRecordStore.Active(r.Snapshot.State)) return r;
-                return r with { StopRequested = false, Snapshot = r.Snapshot with {
-                    State = "interrupted", Phase = "interrupted", CanResume = resumable, DiagnosticCode = "tts_corpus.interrupted" } };
-            }, activeOnly: false);
+                if (e.Current is not { } r || !SameExecution(r, observed) || !TtsCorpusRecordStore.CanResume(r))
+                    return ((TtsCorpusEnvelope?)null, false);
+                string? diagnostic = r.Snapshot.DiagnosticCode == CheckingResume ? Interrupted : r.Snapshot.DiagnosticCode;
+                if (diagnostic == r.Snapshot.DiagnosticCode && resumable == r.Snapshot.CanResume)
+                    return ((TtsCorpusEnvelope?)null, false);
+                var next = r with { Snapshot = r.Snapshot with { CanResume = resumable, DiagnosticCode = diagnostic } };
+                return (e with { Current = Change(r, next) }, true);
+            }, token);
         }
     }
 
@@ -190,7 +220,6 @@ public sealed class TtsCorpusRunner(ProjectJobAccess access, ComputeGate compute
 
     private async Task ValidateRuntime(TtsCorpusRecord r, CancellationToken token)
     {
-        if (!(await runtime.GetReadinessAsync(token)).Ready) throw new TtsCorpusExecutionException("tts_corpus.runtime.not_ready");
         if (!TtsCorpusRecordStore.SameHash(await runtime.GetFingerprintAsync(token), r.RuntimeFingerprint))
             throw new TtsCorpusExecutionException("tts_corpus.runtime.changed");
     }
@@ -253,10 +282,10 @@ public sealed class TtsCorpusRunner(ProjectJobAccess access, ComputeGate compute
         && a.ActionId == b.ActionId && a.Snapshot.ExecutionId == b.Snapshot.ExecutionId;
     private static Task<TtsCorpusRecord?> Read(TtsCorpusRecordStore store, CancellationToken token)
         => store.TransactionAsync(e => ((TtsCorpusEnvelope?)null, e.Current), token);
-    private static Task<bool> Update(TtsCorpusRecordStore store, TtsCorpusRecord identity, Func<TtsCorpusRecord, TtsCorpusRecord> update, bool activeOnly = true)
+    private static Task<bool> Update(TtsCorpusRecordStore store, TtsCorpusRecord identity, Func<TtsCorpusRecord, TtsCorpusRecord> update)
         => store.TransactionAsync(e =>
         {
-            if (e.Current is not { } r || !SameExecution(r, identity) || activeOnly && !TtsCorpusRecordStore.Active(r.Snapshot.State)) return ((TtsCorpusEnvelope?)null, false);
+            if (e.Current is not { } r || !SameExecution(r, identity) || !TtsCorpusRecordStore.Active(r.Snapshot.State)) return ((TtsCorpusEnvelope?)null, false);
             var next = update(r); if (next == r) return ((TtsCorpusEnvelope?)null, false);
             return (e with { Current = Change(r, next) }, true);
         }, CancellationToken.None);

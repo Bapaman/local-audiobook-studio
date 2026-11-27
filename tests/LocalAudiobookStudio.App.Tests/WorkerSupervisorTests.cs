@@ -51,9 +51,9 @@ public class WorkerSupervisorTests
         var runtime = new WorkerRuntimeReadiness(test.Options, test.Managed);
         Assert.True((await runtime.GetAsync(Token)).Ready);
         var descriptor = await ((IRuntimeDescriptor)runtime).GetAsync(Token);
-        Assert.Equal("voxcpm2-local-v1", descriptor.Preset.Id);
+        Assert.Equal("voxcpm2-local-v2", descriptor.Preset.Id);
         Assert.Equal("q8-f16-cpu", descriptor.Preset.ProfileId);
-        Assert.Equal((70, 10, 2d, 1d, 42L), (descriptor.Preset.Steps, descriptor.Preset.Timesteps, descriptor.Preset.Cfg, descriptor.Preset.Temperature, descriptor.Preset.Seed));
+        Assert.Equal((140, 10, 2d, 1d, 42L), (descriptor.Preset.Steps, descriptor.Preset.Timesteps, descriptor.Preset.Cfg, descriptor.Preset.Temperature, descriptor.Preset.Seed));
         Assert.False(descriptor.Preset.AllowCpuFallback);
         Assert.Equal("873056743b74e1a4ce5dcf7290e2298428e214db", descriptor.Versions.Worker);
         Assert.Equal("32279effe8c19989596f05d353d1447f51d9e915", descriptor.Versions.Model);
@@ -249,6 +249,24 @@ public class WorkerSupervisorTests
             writer.Write("RIFF"u8); writer.Write(40); writer.Write("WAVEfmt "u8); writer.Write(16); writer.Write((ushort)1); writer.Write((ushort)1);
             writer.Write(48000); writer.Write(96000); writer.Write((ushort)2); writer.Write((ushort)16); writer.Write("data"u8); writer.Write(4); writer.Write((short)120); writer.Write((short)-120);
         }
-        public void Dispose() => Directory.Delete(Root, true);
+        public void Dispose()
+        {
+            var elapsed = Stopwatch.StartNew();
+            while (true)
+            {
+                try
+                {
+                    Directory.Delete(Root, recursive: true);
+                    return;
+                }
+                catch (Exception failure) when (elapsed.Elapsed < TimeSpan.FromSeconds(2)
+                    && (failure is IOException or UnauthorizedAccessException)
+                    && (failure.HResult & 0xffff) is 5 or 32 or 33)
+                {
+                    // Windows can briefly retain the fake executable's image after process exit.
+                    Thread.Sleep(25);
+                }
+            }
+        }
     }
 }

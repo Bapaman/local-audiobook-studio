@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using LocalAudiobookStudio.Application.TtsCorpus;
+using LocalAudiobookStudio.Core.Projects;
 using Microsoft.Extensions.DependencyInjection;
 using static LocalAudiobookStudio.Web.Tests.TtsCorpusApiFixture;
 
@@ -30,15 +31,62 @@ public sealed class TtsCorpusEndpointTests
     }
 
     [Fact]
-    public async Task Host_recovery_interrupts_durable_queue_without_automatic_resume()
+    public async Task Host_opens_project_while_verifying_interrupted_corpus_without_automatic_resume()
     {
         await using var original = await HostAsync(); var p = await ProjectAsync(original);
         var queued = await original.Services.GetRequiredService<IStudioTtsCorpusService>().StartAsync(p.Id, long.Parse(p.ETag.Trim('"')), "start", true, ApiTestHost.Token);
         await original.StopAsync(ApiTestHost.Token);
-        await using var reopened = await HostAsync(hosted: true, root: original.Root);
-        using var response = await reopened.SendAsync(HttpMethod.Get, PathFor(p.Id)); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var snapshot = await ApiTestHost.JsonAsync(response); Assert.Equal("interrupted", snapshot.GetProperty("state").GetString());
-        Assert.Equal(queued.Id, snapshot.GetProperty("id").GetString()); Assert.True(snapshot.GetProperty("canResume").GetBoolean());
+        var verifying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var runtime = new Runtime { BeforeFingerprint = async token =>
+        {
+            verifying.TrySetResult();
+            await release.Task.WaitAsync(token);
+        } };
+        var executor = new Executor { Before = _ => { dispatched.TrySetResult(); return Task.CompletedTask; } };
+        var reopening = HostAsync(runtime, executor, hosted: true, root: original.Root);
+        try
+        {
+            await verifying.Task.WaitAsync(TimeSpan.FromSeconds(5), ApiTestHost.Token);
+            var host = await reopening.WaitAsync(TimeSpan.FromSeconds(5), ApiTestHost.Token);
+            using var project = await host.SendAsync(HttpMethod.Get, $"/api/projects/{p.Id}");
+            Assert.Equal(HttpStatusCode.OK, project.StatusCode);
+            using var jobs = await host.SendAsync(HttpMethod.Get, $"/api/projects/{p.Id}/jobs");
+            Assert.Equal(HttpStatusCode.OK, jobs.StatusCode);
+            using var response = await host.SendAsync(HttpMethod.Get, PathFor(p.Id));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var snapshot = await ApiTestHost.JsonAsync(response);
+            Assert.Equal("interrupted", snapshot.GetProperty("state").GetString());
+            Assert.Equal(queued.Id, snapshot.GetProperty("id").GetString());
+            Assert.False(snapshot.GetProperty("canResume").GetBoolean());
+            Assert.Equal("tts_corpus.interrupted.checking", snapshot.GetProperty("diagnosticCode").GetString());
+
+            // Synthesis and input edits can still acquire project ownership during the check.
+            await using (var db = await new ProjectService().OpenCurrentAsync(Path.Combine(original.Root, "projects", p.Id), ApiTestHost.Token))
+            await using (await db.AcquireArtifactLeaseAsync(TimeSpan.FromSeconds(1), ApiTestHost.Token))
+                Assert.False(release.Task.IsCompleted);
+
+            release.TrySetResult();
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ApiTestHost.Token);
+            deadline.CancelAfter(TimeSpan.FromSeconds(5));
+            var corpus = host.Services.GetRequiredService<IStudioTtsCorpusService>();
+            TtsCorpusSnapshotDto? recovered;
+            do
+            {
+                recovered = await corpus.GetAsync(p.Id, deadline.Token);
+                if (recovered?.CanResume == true) break;
+                await Task.Delay(25, deadline.Token);
+            } while (true);
+            Assert.Equal("interrupted", recovered.State);
+            Assert.Equal(queued.ExecutionId, recovered.ExecutionId);
+            Assert.False(dispatched.Task.IsCompleted);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await using var reopened = await reopening;
+        }
     }
 
     [Fact]

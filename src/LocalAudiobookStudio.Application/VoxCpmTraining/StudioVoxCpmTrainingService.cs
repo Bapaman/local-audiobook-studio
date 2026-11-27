@@ -116,7 +116,6 @@ public sealed class StudioVoxCpmTrainingService(ProjectJobAccess access, IApprov
     }
     private async Task<VoxCpmTrainingIdentity> ReadyIdentity(CancellationToken token)
     {
-        if (!(await runtime.GetReadinessAsync(token)).Ready) throw Error("runtime.not_ready");
         var identity = await runtime.GetIdentityAsync(token);
         if (!VoxCpmTrainingRecordStore.ValidIdentity(identity)) throw Error("runtime.not_ready"); return identity;
     }

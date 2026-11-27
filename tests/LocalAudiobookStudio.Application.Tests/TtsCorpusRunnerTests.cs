@@ -17,7 +17,7 @@ public sealed class TtsCorpusRunnerTests
         using var f = new Fixture(); var p = await f.Prepare();
         var other = (await f.Box.Service().CreateAsync(new("No corpus"), "other-project", Token)).Snapshot;
         await f.Service().StartAsync(p.Id, p.Revision, "start", true, Token);
-        var runner = Runner(f, new()); await runner.RecoverAsync(Token);
+        var runner = Runner(f, new()); await Recover(runner);
         var s = await f.Service().GetAsync(p.Id, Token);
         Assert.Equal("interrupted", s!.State); Assert.True(s.CanResume);
         Assert.False(await runner.RunNextAsync(Token));
@@ -33,7 +33,7 @@ public sealed class TtsCorpusRunnerTests
         if (change == "runtime") f.Runtime.Fingerprint = new string('b', 64);
         else if (change == "source") await File.AppendAllTextAsync(Path.Combine(f.Root(p.Id), "voice-recording", (await f.Service().GetAsync(p.Id, Token))!.SourceRecordingId + ".wav"), "bad", Token);
         else await File.AppendAllTextAsync(await f.Audio(p.Id), "bad", Token);
-        await Runner(f, new()).RecoverAsync(Token);
+        await Recover(Runner(f, new()));
         var s = await f.Service().GetAsync(p.Id, Token); Assert.Equal("interrupted", s!.State); Assert.False(s.CanResume);
     }
     [Fact]
@@ -41,15 +41,18 @@ public sealed class TtsCorpusRunnerTests
     {
         using var f = new Fixture(); var p = await f.Prepare(); await f.Draft(p, "transcribing", acceptedCount: 1);
         f.Runtime.Fingerprint = new string('b', 64);
-        await Runner(f, new()).RecoverAsync(Token);
+        await Recover(Runner(f, new()));
         var unavailable = (await f.Service().GetAsync(p.Id, Token))!; Assert.False(unavailable.CanResume);
         f.Runtime.Fingerprint = new string('a', 64);
-        var runner = Runner(f, new()); await runner.RecoverAsync(Token);
+        var runner = Runner(f, new()); await Recover(runner);
         var restored = (await f.Service().GetAsync(p.Id, Token))!;
         Assert.True(restored.CanResume); Assert.Equal("interrupted", restored.State); Assert.Equal(1, restored.CompletedClipCount);
         Assert.Equal(unavailable.ExecutionId, restored.ExecutionId); Assert.False(await runner.RunNextAsync(Token));
-        await runner.RecoverAsync(Token); Assert.Equal(restored.Revision, (await f.Service().GetAsync(p.Id, Token))!.Revision);
+        await Recover(runner); Assert.Equal(restored.Revision, (await f.Service().GetAsync(p.Id, Token))!.Revision);
     }
+
+    private static async Task Recover(TtsCorpusRunner runner)
+        => await runner.VerifyResumeOnStartupAsync(await runner.InterruptOnStartupAsync(Token), Token);
     [Fact]
     public async Task Shared_compute_excludes_dispatch_and_releases_after_clean_success()
     {

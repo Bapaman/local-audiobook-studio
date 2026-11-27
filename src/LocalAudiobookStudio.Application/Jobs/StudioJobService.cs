@@ -87,8 +87,13 @@ public sealed class StudioJobService(ProjectJobAccess access, IRuntimeDescriptor
             var itemIds = job.Input.Items.Select(i => i.SegmentId).ToHashSet(StringComparer.Ordinal);
             var sources = db.State.Segments.Where(s => itemIds.Contains(s.Id)).ToArray();
             var chapterIds = sources.Select(s => s.ChapterId).Distinct(StringComparer.Ordinal).ToArray();
-            if (sources.Length == itemIds.Count && chapterIds.Length == 1)
-                snapshot = snapshot with { TextTitle = db.State.Chapters.FirstOrDefault(c => c.Id == chapterIds[0])?.Title };
+            if (sources.Length == itemIds.Count)
+            {
+                if (chapterIds.Length == 1)
+                    snapshot = snapshot with { TextTitle = db.State.Chapters.FirstOrDefault(c => c.Id == chapterIds[0])?.Title };
+                else if (chapterIds.Length > 1)
+                    snapshot = snapshot with { TextCount = chapterIds.Length };
+            }
         }
         if (job.CompletedUnits == 0) return snapshot;
         var inputs = job.Input.Items.ToDictionary(x => x.SegmentId, StringComparer.Ordinal);

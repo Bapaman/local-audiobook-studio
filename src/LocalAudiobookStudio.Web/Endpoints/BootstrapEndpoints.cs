@@ -1,10 +1,13 @@
 using System.Reflection;
+using System.Text.Json.Serialization;
 using LocalAudiobookStudio.Web.Security;
 using LocalAudiobookStudio.Application.Training;
+using LocalAudiobookStudio.Application.Voices;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LocalAudiobookStudio.Web.Endpoints;
 
@@ -50,7 +53,10 @@ public static class BootstrapEndpoints
                     new BootstrapDto(
                         GetVersion(),
                         tokens.RequestToken!,
-                        new BootstrapCapabilities(Generation: false, Training: (await training.GetReadinessAsync(context.RequestAborted)).Ready)));
+                        new BootstrapCapabilities(
+                            Generation: false,
+                            Training: (await training.GetReadinessAsync(context.RequestAborted)).Ready,
+                            VoiceMessages: context.RequestServices.GetService<IVoiceRecordingDecoder>() is not null)));
             });
 
         return endpoints;
@@ -69,4 +75,5 @@ public sealed record BootstrapDto(
     string AntiforgeryRequestToken,
     BootstrapCapabilities Capabilities);
 
-public sealed record BootstrapCapabilities(bool Generation, bool Training);
+public sealed record BootstrapCapabilities(bool Generation, bool Training,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool VoiceMessages = false);

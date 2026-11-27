@@ -49,7 +49,11 @@ internal sealed class VoxCpmTrainingFixture : IDisposable
         public Task<VoxCpmTrainingReadinessDto> GetReadinessAsync(CancellationToken token = default)
         { Calls++; if (RejectAll) throw new InvalidOperationException("No runtime admission permitted"); return Task.FromResult(new VoxCpmTrainingReadinessDto(Ready, Ready ? null : "voxcpm_training.runtime.not_ready")); }
         public Task<VoxCpmTrainingIdentity> GetIdentityAsync(CancellationToken token)
-        { Calls++; if (RejectAll) throw new InvalidOperationException("No runtime admission permitted"); return Task.FromResult(Identity); }
+        {
+            Calls++;
+            if (RejectAll) throw new InvalidOperationException("No runtime admission permitted");
+            return Ready ? Task.FromResult(Identity) : Task.FromException<VoxCpmTrainingIdentity>(new VoxCpmTrainingExecutionException("voxcpm_training.runtime.not_ready"));
+        }
     }
     internal sealed class Validator : IVoxCpmTrainingCheckpointValidator
     {

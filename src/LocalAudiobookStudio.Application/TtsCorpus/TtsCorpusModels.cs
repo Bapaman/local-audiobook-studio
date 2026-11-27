@@ -31,6 +31,7 @@ public interface IStudioTtsCorpusService
 public interface ITtsCorpusRuntime
 {
     Task<TtsCorpusReadinessDto> GetReadinessAsync(CancellationToken token = default);
+    /// <summary>Validates the runtime files before returning the current fingerprint.</summary>
     Task<string> GetFingerprintAsync(CancellationToken token = default);
 }
 public interface ITtsCorpusExecutor

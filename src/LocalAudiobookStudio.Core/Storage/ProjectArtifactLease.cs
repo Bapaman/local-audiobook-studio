@@ -28,6 +28,11 @@ public sealed class ProjectArtifactLease : IAsyncDisposable
     /// <summary>Reject accepted-input edits while any job is nonterminal; retain this lease through the edit.</summary>
     public Task RequireNoActiveJobsAsync(CancellationToken cancellationToken = default) => project.Jobs.RequireNoActiveJobsAsync(this, cancellationToken);
     public Task SaveAsync(ProjectState state, CancellationToken cancellationToken = default) => project.SaveUnderLeaseAsync(this, state, cancellationToken);
+    public Task SetAudioReviewAsync(long expectedRevision, string segmentId, string artifactId, bool reviewed, CancellationToken cancellationToken = default)
+        => project.SetAudioReviewAsync(this, expectedRevision, segmentId, artifactId, reviewed, cancellationToken);
+    public Task SetAudioCorrectionAsync(long expectedRevision, string segmentId, string? note, AudioCorrectionBaseline expected,
+        bool rejectCurrent, CancellationToken cancellationToken = default)
+        => project.SetAudioCorrectionAsync(this, expectedRevision, segmentId, note, expected, rejectCurrent, cancellationToken);
     /// <summary>Append a separate immutable text while preserving all existing project inputs and history.</summary>
     public Task AppendTextAsync(long expectedRevision, ChapterRecord chapter, IReadOnlyList<SegmentRecord> segments, CancellationToken cancellationToken = default)
         => project.AppendTextUnderLeaseAsync(this, expectedRevision, chapter, segments, cancellationToken);

@@ -41,18 +41,30 @@ public class AcceptedArtifactLookupTests
         using var box = new ProjectSandbox(); await using var db = await ProjectJobStoreTests.Prepared(box);
         await using var lease = await db.AcquireArtifactLeaseAsync(cancellationToken: Token);
         AcceptedJobArtifact? first = null, latest = null;
+        AcceptedJobArtifact? previousSecond = null, latestSecond = null;
         for (int i = 0; i < 34; i++)
         {
-            var input = ProjectJobStoreTests.Input(db); input = input with { Items = [input.Items[0]] };
-            var job = await db.Jobs.EnqueueAsync(lease, db.State.Revision, "new" + i, JobKind.Preview, input, Token);
-            var claim = (await lease.BeginGenerationUnitAsync(job.Id, input.Items[0].SegmentId, input.Preset, Token))!;
-            latest = Publish(db, claim); first ??= latest;
-            await lease.AcceptGenerationUnitAsync(claim, latest, Token);
+            var input = ProjectJobStoreTests.Input(db);
+            if (i >= 2) input = input with { Items = [input.Items[0]] };
+            var job = await db.Jobs.EnqueueAsync(lease, db.State.Revision, "new" + i, JobKind.Generation, input, Token);
+            foreach (var item in input.Items)
+            {
+                var claim = (await lease.BeginGenerationUnitAsync(job.Id, item.SegmentId, input.Preset, Token))!;
+                var artifact = Publish(db, claim);
+                if (item.SegmentId == input.Items[0].SegmentId) { latest = artifact; first ??= artifact; }
+                else { latestSecond = artifact; previousSecond ??= artifact; }
+                await lease.AcceptGenerationUnitAsync(claim, artifact, Token);
+            }
         }
         Assert.Equal(32, (await db.Jobs.ListAsync(Token)).Count);
         Assert.Equal(first, await db.Jobs.FindAcceptedArtifactAsync(first!.Id, Token));
         Assert.Equal(latest!.Id, (await db.Jobs.ReadCurrentOutputArtifactIdsAsync(Token))[db.State.Segments[0].Id]);
         Assert.True(File.Exists(db.ResolveOwnedPath(first.RelativePath)));
+        var snapshot = await db.ReadCurrentSnapshotAsync(Token);
+        var second = snapshot.State.Segments[1];
+        Assert.Equal(latestSecond!.Id, snapshot.OutputArtifactIds[second.Id]);
+        Assert.Equal(previousSecond!.Id, snapshot.PreviousAudio![second.Id].ArtifactId);
+        Assert.Equal(second.SpokenText, snapshot.PreviousAudio[second.Id].SpokenText);
     }
 
     [Fact]

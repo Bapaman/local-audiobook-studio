@@ -27,6 +27,7 @@ public interface IStudioVoxCpmTrainingService
 public interface IVoxCpmTrainingRuntime
 {
     Task<VoxCpmTrainingReadinessDto> GetReadinessAsync(CancellationToken token = default);
+    /// <summary>Validates the runtime files before returning the current identity.</summary>
     Task<VoxCpmTrainingIdentity> GetIdentityAsync(CancellationToken token);
 }
 public interface IVoxCpmTrainingCheckpointValidator

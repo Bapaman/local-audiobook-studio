@@ -143,6 +143,31 @@ public class ProjectActivityTests
         Assert.False(File.Exists(main + "-journal"));
     }
 
+    [Fact]
+    public async Task Browser_open_waits_for_short_sharing_contention_on_a_closed_project()
+    {
+        using var box = new CatalogSandbox();
+        string id = Guid.NewGuid().ToString("N"), root = box.ProjectRoot(id);
+        await using (var created = await new LocalAudiobookStudio.Core.Projects.ProjectService().CreateAsync(root, "Legacy", id, Token)) { }
+        CatalogSandbox.Sql(root, "PRAGMA journal_mode=DELETE");
+        await box.Catalog().InsertAsync(new(id, DateTimeOffset.MinValue), Token);
+        string main = Path.Combine(root, "project.sqlite");
+        Assert.False(File.Exists(main + "-journal"));
+        byte[] before = await File.ReadAllBytesAsync(main, Token);
+
+        Task<ProjectSnapshotDto> open;
+        using (File.Open(main, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
+        {
+            open = box.Service().OpenAsync(id, Token);
+            // Give the first guarded copy a chance to collide with the writer.
+            await Task.WhenAny(open, Task.Delay(TimeSpan.FromMilliseconds(75), Token));
+        }
+
+        Assert.Equal("Legacy", (await open).DisplayName);
+        Assert.Equal(before, await File.ReadAllBytesAsync(main, Token));
+        Assert.False(File.Exists(main + "-journal"));
+    }
+
     private static Task<ProjectSnapshotDto> Read(StudioProjectService service, string id, bool open, CancellationToken token)
         => open ? service.OpenAsync(id, token) : service.GetAsync(id, token);
 

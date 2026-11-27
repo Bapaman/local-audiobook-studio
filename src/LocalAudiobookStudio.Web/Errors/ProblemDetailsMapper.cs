@@ -136,9 +136,11 @@ public sealed class ProblemDetailsMapper(RequestDelegate next)
         "project.idempotency.conflict" or "voice.recording.exists" or "voice.exists" or "text.exists" or "text.reimport_required" or "job.active"
             or "text.idempotency.conflict" or "job.idempotency.conflict" or "job.input_changed" or "job.transition.invalid" => (409, code),
         "voice.rights" => (403, code),
+        "voice.decoder.unavailable" or "voice.decoder.timeout" or "voice.decoder.busy" => (503, code),
+        "voice.decoder.invalid" => (400, code),
         "text.encoding.unsupported" => (415, code),
         "project.id.invalid" or "project.title.invalid" or "project.idempotency.invalid" or "text.display_name.invalid" or "text.id.invalid" or "text.append.invalid" or "job.input.invalid"
-            or "text.binary" or "text.empty" or "text.encoding.invalid" or "text.grapheme_boundary" or "text.token_too_long"
+            or "text.binary" or "text.empty" or "text.encoding.invalid" or "text.grapheme_boundary" or "text.token_too_long" or "text.chapters.not_found" or "text.chapters.empty"
             or "wav.empty" or "wav.format" or "wav.samples" or "wav.truncated"
             or "voice.recording.too_short" or "voice.recording.too_long" or "voice.recording.missing"
             or "voice.anchor.confirmation" or "voice.anchor.range" or "voice.transcript" or "voice.clipped" => (400, code),

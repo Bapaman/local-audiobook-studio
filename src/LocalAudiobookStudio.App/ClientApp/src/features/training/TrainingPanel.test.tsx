@@ -33,7 +33,10 @@ function serve(overrides: Record<string, Responder> = {}) {
   return calls;
 }
 function open(snapshot = project) {
-  return render(<ProjectWorkspacePage current={{ snapshot, etag: '"2"' }} generation={{ jobs: [], readiness: { ready: true, experimental: true, diagnosticCode: null, profileId: 'q8-f16-cpu' }, pending: false, error: '', connected: true, enqueue: async () => {}, control: async () => {} }} segmentRefresh={{}} busy={false} headingRef={null} mutate={async () => {}} onBack={() => {}} />);
+  const view = render(<ProjectWorkspacePage current={{ snapshot, etag: '"2"' }} generation={{ jobs: [], readiness: { ready: true, experimental: true, diagnosticCode: null, profileId: 'q8-f16-cpu' }, pending: false, error: '', connected: true, enqueue: async () => {}, control: async () => {} }} segmentRefresh={{}} busy={false} headingRef={null} mutate={async () => {}} onBack={() => {}} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Дообучение' }));
+  if (snapshot.voiceRecording) fireEvent.click(screen.getByText('Прежний способ обучения · RVC'));
+  return view;
 }
 const panel = () => screen.getByRole('region', { name: 'Обучение на полной записи' });
 afterEach(() => vi.useRealTimers());
@@ -80,21 +83,22 @@ describe('Local training controls', () => {
     await screen.findByRole('alert');
     expect(calls.filter(c => c.init?.method === 'POST')).toHaveLength(1);
   });
-  it('disables training when local runtime is unready and shows its safe diagnostic', async () => {
+  it('hides legacy training when there is neither a runtime nor saved history', async () => {
     serve({ 'GET /api/training/readiness': () => ({ body: { ready: false, experimental: true, diagnosticCode: 'training.runtime.not_ready', cpuThreads: 2 } }) });
     open();
-    expect(await screen.findByText(/training.runtime.not_ready/)).toBeInTheDocument();
-    expect(within(panel()).getByRole('button', { name: 'Обучить голос' })).toBeDisabled();
+    await act(async () => {});
+    expect(screen.getByText('Прежний способ обучения · RVC')).not.toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Обучить голос' })).not.toBeInTheDocument();
   });
-  it('requires the saved full recording before training', async () => {
+  it('guides to the voice recording before showing legacy training controls', () => {
     serve(); open({ ...project, voiceRecording: null } as unknown as typeof project);
-    expect(await within(panel()).findByText(/Сначала сохраните исходную запись/)).toBeInTheDocument();
-    expect(within(panel()).getByRole('button', { name: 'Обучить голос' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Добавить запись голоса' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Обучить голос' })).not.toBeInTheDocument();
   });
   it('requires explicit acknowledgement and starts with project CAS, CSRF and idempotency', async () => {
     const calls = serve({ 'POST /api/projects/book1/training': () => ({ body: { ...training, state: 'queued', revision: 1 }, status: 202, etag: '"1"' }) });
     open(); const user = userEvent.setup();
-    const consent = await within(panel()).findByRole('checkbox', { name: /экспериментальное обучение/ });
+    const consent = await screen.findByRole('checkbox', { name: /экспериментальное обучение/ });
     const start = within(panel()).getByRole('button', { name: 'Обучить голос' });
     expect(start).toBeDisabled(); await user.click(consent); await user.click(start);
     expect(await screen.findByText('В очереди')).toBeInTheDocument();
@@ -110,9 +114,11 @@ describe('Local training controls', () => {
     expect(progress).toHaveTextContent('Глобальный шаг:41');
     expect(progress).toHaveTextContent('Завершённые эпохи:1');
     expect(progress).toHaveTextContent('Шагов в эпохе:32');
-    await waitFor(() => expect(screen.getByLabelText('Произносимый текст 1')).toBeDisabled());
+    expect(screen.getByText(/Озвучивание нового текста использует короткий/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Тексты' }));
+    await waitFor(() => expect(screen.getByLabelText('Текст фрагмента 1')).toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Озвучивание' }));
     expect(screen.getByRole('button', { name: 'Проба голоса' })).toBeDisabled();
-    expect(screen.getByText(/Озвучивание нового текста использует короткий/)).toBeInTheDocument();
   });
   it('stops with training CAS then continues one next epoch from saved versions without quality claims', async () => {
     const saved = { ...training, revision: 4, state: 'completed', canResume: true, models: [{ id: 'model1', globalStep: 64, completedEpoch: 2, createdUtc: training.updatedUtc, qualityEstablished: false }] };
@@ -136,6 +142,7 @@ describe('Local training controls', () => {
       'GET /api/projects/book1/training': () => ({ body: started ? { ...training, revision: 8, globalStep: 57 } : null, ...(started ? { etag: '"8"' } : {}) }),
       'POST /api/projects/book1/training': () => { started = true; return { body: { ...training, state: 'queued', revision: 1 }, etag: '"1"' }; },
     }); const view = open();
+    await screen.findByRole('region', { name: 'Обучение на полной записи' });
     await screen.findByText(/Локальный движок обучения готов/);
     vi.useFakeTimers();
     fireEvent.click(within(panel()).getByRole('checkbox', { name: /экспериментальное обучение/ }));
@@ -171,7 +178,7 @@ describe('Local training controls', () => {
   it('keeps the idempotency key after a lost response and requires a user retry', async () => {
     let attempts = 0;
     const calls = serve({ 'POST /api/projects/book1/training': () => { if (++attempts === 1) throw new Error('Lost response'); return { body: { ...training, state: 'queued', revision: 1 }, etag: '"1"' }; } });
-    open(); const user = userEvent.setup(); await user.click(await within(panel()).findByRole('checkbox', { name: /экспериментальное обучение/ }));
+    open(); const user = userEvent.setup(); await user.click(await screen.findByRole('checkbox', { name: /экспериментальное обучение/ }));
     await user.click(screen.getByRole('button', { name: 'Обучить голос' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Нет связи/); expect(attempts).toBe(1);
     await user.click(screen.getByRole('button', { name: 'Обучить голос' })); await screen.findByText('В очереди');
@@ -204,7 +211,7 @@ describe('Local training controls', () => {
       'POST /api/projects/book1/training/train1/resume': () => ({ body: { ...paused, state: 'queued', revision: 4, diagnosticCode: null }, etag: '"4"' }),
     }); open(); const user = userEvent.setup();
     expect(await screen.findByText(new RegExp(message))).toBeInTheDocument();
-    expect(screen.getByRole('article', { name: 'Прогресс обучения' })).toHaveTextContent('Завершённые эпохи:1');
+    expect(await screen.findByRole('article', { name: 'Прогресс обучения' })).toHaveTextContent('Завершённые эпохи:1');
     expect(screen.queryByRole('button', { name: 'Обучить следующую эпоху' })).not.toBeInTheDocument();
     await user.click(within(panel()).getByRole('checkbox', { name: /экспериментальное обучение/ }));
     await user.click(screen.getByRole('button', { name: 'Продолжить обучение' })); await screen.findByText('В очереди');

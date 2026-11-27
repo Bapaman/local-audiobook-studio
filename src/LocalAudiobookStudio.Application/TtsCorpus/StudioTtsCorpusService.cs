@@ -193,7 +193,6 @@ public sealed class StudioTtsCorpusService(ProjectJobAccess access, ITtsCorpusRu
         => store.TransactionAsync(e => ((TtsCorpusEnvelope?)null, store.Replay(e, key, request)), token);
     private async Task<string> ReadyFingerprint(CancellationToken token)
     {
-        if (!(await runtime.GetReadinessAsync(token)).Ready) throw new StudioException("tts_corpus.runtime.not_ready");
         string fingerprint = await runtime.GetFingerprintAsync(token);
         if (!TtsCorpusRecordStore.HashValid(fingerprint)) throw new StudioException("tts_corpus.runtime.not_ready"); return fingerprint;
     }

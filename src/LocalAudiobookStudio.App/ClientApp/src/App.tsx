@@ -11,6 +11,7 @@ export default function App() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [current, setCurrent] = useState<SnapshotResponse>();
   const [segmentRefresh, setSegmentRefresh] = useState<Record<string, number>>({});
+  const [projectDrafts, setProjectDrafts] = useState(false);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [closed, setClosed] = useState(false);
@@ -31,6 +32,12 @@ export default function App() {
     return () => { active = false; };
   }, [client]);
   useEffect(() => { heading.current?.focus(); }, [current?.snapshot.id, closed]);
+  useEffect(() => {
+    if (!projectDrafts) return;
+    function warnBeforeUnload(event: BeforeUnloadEvent) { event.preventDefault(); }
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [projectDrafts]);
 
   async function action(work: () => Promise<void>, onConflictRefresh?: () => void, conflictMessage?: string) {
     setBusy(true); setError('');
@@ -43,12 +50,12 @@ export default function App() {
   }
   async function mutate(suffix: string, body: unknown, method = 'POST') {
     if (!current) return;
-    const segmentId = suffix.startsWith('/segments/') ? suffix.slice('/segments/'.length) : undefined;
+    const segmentId = /^\/segments\/([^/]+)$/.exec(suffix)?.[1];
     const refreshSavedEditor = () => { if (segmentId) setSegmentRefresh(previous => ({ ...previous, [segmentId]: (previous[segmentId] ?? 0) + 1 })); };
     await action(async () => {
       installProject(await client.snapshot(`/api/projects/${current.snapshot.id}${suffix}`, method, body, current.etag));
       refreshSavedEditor();
-    }, refreshSavedEditor, segmentId ? 'Проект изменён из другой вкладки. Правка фрагмента не сохранена. Загружена текущая версия проекта; конфликтующий фрагмент обновлён. Проверьте его перед новой правкой.' : undefined);
+    }, refreshSavedEditor, segmentId ? 'Текст изменён из другой вкладки. Правка фрагмента не сохранена. Загружена текущая версия фрагмента. Проверьте её перед новой правкой.' : undefined);
   }
 
   return <>
@@ -56,14 +63,19 @@ export default function App() {
     <header className="app-header">
       <div className="brand"><span className="brand-mark" aria-hidden="true">а</span><div>Моя аудиокнига<span className="brand-subtitle">Локальная студия</span></div></div>
       <div className="header-actions"><span className="local-badge">На вашем компьютере</span>
-        {bootstrap && !closed && <button className="quiet" disabled={busy} onClick={() => void action(async () => { await client.exit(); setClosed(true); setCurrent(undefined); })}>Выйти из приложения</button>}
+        {bootstrap && !closed && <button className="quiet" disabled={busy || projectDrafts}
+          aria-describedby={projectDrafts ? 'project-draft-status' : undefined}
+          onClick={() => void action(async () => { await client.exit(); setClosed(true); setCurrent(undefined); })}>Выйти из приложения</button>}
       </div>
     </header>
     <main id="main" aria-busy={busy}>
       {error && <div className="notice error" role="alert">{error}</div>}
-      {closed ? <section className="hero"><h1 ref={heading} tabIndex={-1}>Студия закрывается</h1><p>Проекты сохранены. Эту вкладку можно закрыть; для продолжения откройте приложение через ярлык.</p></section>
+      {closed ? <section className="hero"><h1 ref={heading} tabIndex={-1}>Студия закрывается</h1><p>Голоса и тексты сохранены. Для продолжения откройте приложение через ярлык.</p></section>
         : !bootstrap ? <section className="hero"><h1>Моя аудиокнига</h1>{busy && <p role="status">Подключаем локальную студию…</p>}</section>
-        : current ? <ProjectWorkspacePage current={current} generation={generation} segmentRefresh={segmentRefresh} busy={busy} headingRef={heading} mutate={mutate} client={client} installProject={installProject} onBack={() => void action(async () => { setProjects(await client.list()); setCurrent(undefined); })} />
+        : current ? <ProjectWorkspacePage current={current} generation={generation} segmentRefresh={segmentRefresh}
+          busy={busy} headingRef={heading} mutate={mutate} client={client} installProject={installProject} onDraftsChange={setProjectDrafts}
+          voiceMessages={bootstrap.capabilities.voiceMessages}
+          onBack={() => void action(async () => { setProjects(await client.list()); setCurrent(undefined); })} />
         : <ProjectListPage projects={projects} busy={busy} headingRef={heading} onCreate={name => void action(async () => {
           if (creation.current?.name !== name) creation.current = { name, key: crypto.randomUUID() };
           setCurrent(await client.snapshot('/api/projects', 'POST', { displayName: name }, undefined, creation.current.key)); creation.current = undefined;

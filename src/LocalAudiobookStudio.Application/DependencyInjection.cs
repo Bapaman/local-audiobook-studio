@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.TryAddSingleton<IStudioTextService, StudioTextService>();
         services.TryAddSingleton<IProjectArtifactReader, ProjectArtifactReader>();
         services.TryAddSingleton<BookDownloadService>();
+        services.TryAddSingleton<ChapterArchiveDownloadService>();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<UnavailableRuntime>(_ => new());
         services.TryAddSingleton<IRuntimeReadiness>(provider => provider.GetRequiredService<UnavailableRuntime>());

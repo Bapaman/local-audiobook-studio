@@ -13,6 +13,7 @@ public sealed class PcmWavAssemblyTests
         BinaryPrimitives.WriteInt16LittleEndian(first.AsSpan(54), 123);
         BinaryPrimitives.WriteInt16LittleEndian(second.AsSpan(54), -456);
         using var a = new MemoryStream(first); using var b = new MemoryStream(second); using var output = new MemoryStream();
+        Assert.Equal(96, await PcmWavAssembly.ReadPcmLengthAsync(a, TestContext.Current.CancellationToken));
         var assembly = await PcmWavAssembly.CreateAsync([a, b], TestContext.Current.CancellationToken);
         await assembly.CopyToAsync(output, TestContext.Current.CancellationToken);
         byte[] actual = output.ToArray();
@@ -36,5 +37,27 @@ public sealed class PcmWavAssemblyTests
         await Assert.ThrowsAsync<WavInspectionException>(() => PcmWavAssembly.CreateAsync([], TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<WavInspectionException>(() => PcmWavAssembly.CreateAsync(Enumerable.Repeat<Stream>(new MemoryStream(),257).ToArray(), TestContext.Current.CancellationToken));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => PcmWavAssembly.CreateAsync([new MemoryStream()], new CancellationToken(true)));
+    }
+
+    [Fact]
+    public async Task Combined_PCM_limit_is_checked_using_chunk_lengths_before_copying_audio()
+    {
+        using var box = new WavSandbox();
+        byte[] header = File.ReadAllBytes(box.Write(samples: 48))[..44];
+        const int dataLength = (1 << 29) + 2;
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(4), dataLength + 36);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(40), dataLength);
+        using var first = new SizedWavStream(header, dataLength + 44L);
+        using var second = new SizedWavStream(header, dataLength + 44L);
+        var token = TestContext.Current.CancellationToken;
+
+        Assert.Equal(dataLength, await PcmWavAssembly.ReadPcmLengthAsync(first, token));
+        var error = await Assert.ThrowsAsync<WavInspectionException>(() => PcmWavAssembly.CreateAsync([first, second], token));
+        Assert.Equal("book.byte_limit", error.Code);
+    }
+
+    private sealed class SizedWavStream(byte[] header, long declaredLength) : MemoryStream(header)
+    {
+        public override long Length => declaredLength;
     }
 }

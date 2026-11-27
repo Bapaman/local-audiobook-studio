@@ -1,8 +1,9 @@
-import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { ApiError, StudioClient } from './api/client';
+import type { ProjectSnapshot } from './api/types';
 import { TestEventSource } from './test-events';
 import { useProjectEvents } from './features/generation/useProjectEvents';
 
@@ -51,8 +52,8 @@ function serve(overrides: Record<string, Responder> = {}, snapshot: unknown = pr
 }
 async function open(overrides: Record<string, Responder> = {}, snapshot: unknown = project) {
   const calls = serve(overrides, snapshot); const user = userEvent.setup(); render(<App />);
-  await screen.findByText('Пока нет проектов'); await user.type(screen.getByLabelText('Название проекта'), 'Моя книга');
-  await user.click(screen.getByRole('button', { name: 'Создать проект' }));
+  await screen.findByText('Пока нет голосов'); await user.type(screen.getByLabelText('Название голоса'), 'Моя книга');
+  await user.click(screen.getByRole('button', { name: 'Добавить голос' }));
   await screen.findByRole('heading', { name: 'Моя книга' });
   return { user, calls };
 }
@@ -60,6 +61,68 @@ const emit = async (type = 'job', source = TestEventSource.instances.at(-1)!) =>
 const deferred = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; };
 
 describe('Persistent generation interface', () => {
+  it('selects only fragments without audio and follows newly accepted audio before enqueueing', async () => {
+    let snapshot: ProjectSnapshot = { ...project, segments: project.segments.map(item => ({
+      ...item, outputArtifactId: item.id === 's1' ? 'audio1' : null,
+    })) };
+    const { user, calls } = await open({
+      'GET /api/projects/book1': () => ({ body: snapshot, etag: `"${snapshot.revision}"` }),
+      'POST /api/projects/book1/jobs': () => ({ body: { ...job, state: 'queued', totalUnits: 1 }, status: 202, etag: '"3"' }),
+    }, snapshot);
+    const fragmentSettings = screen.getByText('Выбор фрагментов');
+    expect(fragmentSettings.closest('details')).not.toHaveAttribute('open');
+    await user.click(fragmentSettings);
+    const selection = screen.getByRole('group', { name: 'Фрагменты для озвучивания' });
+    const first = within(selection).getByRole('checkbox', { name: 'Фрагмент 1' });
+    const second = within(selection).getByRole('checkbox', { name: 'Фрагмент 2' });
+    const third = within(selection).getByRole('checkbox', { name: 'Фрагмент 3' });
+    const missing = within(selection).getByRole('button', { name: 'Выбрать без аудио' });
+
+    await user.click(missing);
+    expect(first).not.toBeChecked();
+    expect(second).toBeChecked();
+    expect(third).toBeChecked();
+    expect(first).toHaveAccessibleDescription('Есть аудио');
+    await user.click(within(selection).getByRole('button', { name: 'Выбрать все' }));
+    expect(first).toBeChecked();
+    await user.click(missing);
+    expect(calls.filter(call => call.init?.method === 'POST' && call.path.endsWith('/jobs'))).toHaveLength(0);
+
+    snapshot = { ...snapshot, revision: 3, segments: snapshot.segments.map(item =>
+      item.id === 's3' ? { ...item, outputArtifactId: 'audio3' } : item) };
+    await emit();
+    expect(third).not.toBeChecked();
+    expect(within(selection).getByText('Выбрано 1 из 3')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Озвучить выбранные фрагменты' }));
+    const command = calls.find(call => call.init?.method === 'POST' && call.path.endsWith('/jobs'))!;
+    expect(JSON.parse(command.init!.body as string)).toEqual({ kind: 'generation', segmentIds: ['s2'] });
+    expect(new Headers(command.init?.headers).get('If-Match')).toBe('"3"');
+  });
+
+  it('keeps active controls visible, opens older jobs on demand, and shows a job after it finishes', async () => {
+    const current = { ...job, textTitle: 'Текущая глава' };
+    const previous = { ...job, id: 'previous', state: 'completed', textTitle: 'Последняя проба',
+      createdUtc: '2026-10-10T15:00:00Z' };
+    const older = { ...previous, id: 'older', textTitle: 'Первая проба', createdUtc: '2026-10-10T10:00:00Z',
+      audioResults: [{ segmentId: 's1', order: 0, artifactId: 'archive-audio', seconds: 1, spokenText: 'Текст первой пробы.' }] };
+    let jobs = [current, previous, older];
+    const { user } = await open({ 'GET /api/projects/book1/jobs': () => ({ body: jobs }) });
+    const queue = await screen.findByRole('region', { name: 'Очередь озвучивания' });
+    expect(within(queue).getByText('Текст: Текущая глава')).toBeVisible();
+    expect(within(queue).getByRole('button', { name: 'Пауза' })).toBeEnabled();
+    expect(within(screen.getByRole('region', { name: 'Последнее задание' })).getByText('Текст: Последняя проба')).toBeVisible();
+    const disclosure = screen.getByText('История заданий', { exact: true });
+    expect(screen.queryByText('Текст: Первая проба')).not.toBeInTheDocument();
+    await user.click(disclosure);
+    expect(await screen.findByText('Текст: Первая проба')).toBeVisible();
+    expect(screen.getByLabelText('Аудио результата 1')).toHaveAttribute('src', '/api/projects/book1/artifacts/archive-audio');
+    await user.click(disclosure);
+    await waitFor(() => expect(screen.queryByText('Текст: Первая проба')).not.toBeInTheDocument());
+    jobs = [{ ...current, state: 'completed', completedUnits: 2, revision: 4 }, previous, older];
+    await emit();
+    expect(screen.queryByRole('region', { name: 'Очередь озвучивания' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Последнее задание' })).getByText('Текст: Текущая глава')).toBeVisible();
+  });
   it('explains unconfirmed decode-limit completion and waits for an explicit user command', async () => {
     const { calls } = await open({ 'GET /api/projects/book1/jobs': () => ({ body: [{ ...job, state: 'failed', phase: 'failed', diagnosticCode: 'worker.output.limit' }] }) });
     expect(await screen.findByText(/Не удалось подтвердить, что фрагмент прочитан до конца/)).toHaveTextContent(/Разделите его на более короткие фрагменты/);
@@ -89,6 +152,13 @@ describe('Persistent generation interface', () => {
     const { user, calls } = await open({ ...savedRoutes,
       ...(missing === 'runtime' ? { 'GET /api/training/readiness': () => ({ body: { ready: false, experimental: true, diagnosticCode: 'training.runtime.not_ready', cpuThreads: 2 } }) } : {}),
     }, missing === 'anchor' ? { ...project, voiceAnchor: null } : project);
+    if (missing === 'anchor') {
+      expect(screen.getByRole('button', { name: 'Подтвердить образец' })).toBeVisible();
+      expect(screen.queryByLabelText('Голос для озвучивания')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Проба голоса' })).not.toBeInTheDocument();
+      expect(calls.filter(call => call.path.endsWith('/jobs') && call.init?.method === 'POST')).toHaveLength(0);
+      return;
+    }
     await screen.findByRole('option', { name: /шаг 125/ });
     await user.selectOptions(screen.getByLabelText('Голос для озвучивания'), 'saved1');
     await user.click(screen.getByLabelText(/Подтверждаю экспериментальное применение сохранённой модели/));
@@ -126,12 +196,15 @@ describe('Persistent generation interface', () => {
     expect(screen.getByLabelText('Голос для озвучивания')).toHaveValue('saved1');
     expect(confirmation).toBeChecked();
     expect(calls.filter(call => call.path.endsWith('/jobs') && call.init?.method === 'POST')).toHaveLength(1);
-    expect(screen.getByText('Версия 9')).toBeInTheDocument();
+    expect(screen.getByTitle('Версия 9')).toBeInTheDocument();
   });
   it('does not show selectable versions belonging to another recording', async () => {
-    const { calls } = await open({ ...savedRoutes, 'GET /api/projects/book1/training': () => ({ body: { ...savedTraining, sourceRecordingId: 'other-recording' }, etag: '"5"' }) });
+    const { user, calls } = await open({ ...savedRoutes, 'GET /api/projects/book1/training': () => ({ body: { ...savedTraining, sourceRecordingId: 'other-recording' }, etag: '"5"' }) });
     const choice = await screen.findByLabelText('Голос для озвучивания');
+    await user.click(screen.getByRole('button', { name: 'Дообучение' }));
+    await user.click(screen.getByText('Прежний способ обучения · RVC'));
     await screen.findByRole('heading', { name: 'Сохранённые версии модели' });
+    await user.click(screen.getByRole('button', { name: 'Озвучивание' }));
     expect(choice).toHaveValue('');
     expect(screen.queryByRole('option', { name: /шаг 125/ })).not.toBeInTheDocument();
     expect(calls.filter(call => call.path.endsWith('/jobs') && call.init?.method === 'POST')).toHaveLength(0);
@@ -154,15 +227,17 @@ describe('Persistent generation interface', () => {
     expect(await screen.findByRole('link', { name: 'Скачать всю книгу · WAV' })).toHaveAttribute('href', '/api/projects/book1/book.wav?revision=2');
   });
   it('does not present an incomplete collection as a full audiobook', async () => {
-    await open();
+    await open({}, { ...project, segments: [{ ...project.segments[0], outputArtifactId: 'audio1' }, ...project.segments.slice(1)] });
     expect(screen.queryByRole('link', { name: 'Скачать всю книгу · WAV' })).not.toBeInTheDocument();
-    expect(await screen.findByText('Для скачивания всей книги сначала озвучьте все фрагменты.')).toBeInTheDocument();
+    expect(await screen.findByText('WAV будет доступен после озвучивания всех фрагментов.')).toBeInTheDocument();
   });
   it('does not retain pruned terminal jobs forever after authoritative history refresh', async () => {
     let pruned = false;
     const history = Array.from({ length: 32 }, (_, i) => ({ ...job, id: `recent${i}`, state: 'completed', phase: 'completed', completedUnits: 2, createdUtc: `2026-10-11T00:01:${String(i).padStart(2, '0')}Z` }));
-    await open({ 'GET /api/projects/book1/jobs': () => ({ body: pruned ? history : [{ ...job, state: 'completed', completedUnits: 2 }] }) });
+    const { user } = await open({ 'GET /api/projects/book1/jobs': () => ({ body: pruned ? history : [{ ...job, state: 'completed', completedUnits: 2 }] }) });
     await screen.findByRole('article', { name: 'Задание озвучивания' }); pruned = true; await emit();
+    await user.click(await screen.findByText('История заданий', { exact: true }));
+    expect(await screen.findByText(/последние 32 завершённых задания/)).toBeVisible();
     await waitFor(() => expect(screen.getAllByRole('article', { name: 'Задание озвучивания' })).toHaveLength(32));
   });
   it('reuses the request key after network uncertainty without automatically issuing another command', async () => {
@@ -205,12 +280,13 @@ describe('Persistent generation interface', () => {
   it('preserves two dirty editors while a clean editor follows background snapshot changes', async () => {
     let changed = false;
     const { user } = await open({ 'GET /api/projects/book1': () => ({ body: changed ? { ...project, revision: 4, segments: project.segments.map(s => ({ ...s, spokenText: `Новый ${s.id}`, outputArtifactId: s.id === 's1' ? 'audio1' : null })) } : project, etag: changed ? '"4"' : '"2"' }) });
-    await user.clear(screen.getByLabelText('Произносимый текст 1')); await user.type(screen.getByLabelText('Произносимый текст 1'), 'Моя первая правка');
-    await user.clear(screen.getByLabelText('Произносимый текст 2')); await user.type(screen.getByLabelText('Произносимый текст 2'), 'Моя вторая правка');
-    changed = true; await emit('reset'); await screen.findByText('Версия 4');
-    expect(screen.getByLabelText('Произносимый текст 1')).toHaveValue('Моя первая правка');
-    expect(screen.getByLabelText('Произносимый текст 2')).toHaveValue('Моя вторая правка');
-    expect(screen.getByLabelText('Произносимый текст 3')).toHaveValue('Новый s3');
+    await user.click(screen.getByRole('button', { name: 'Тексты' }));
+    await user.clear(screen.getByLabelText('Текст фрагмента 1')); await user.type(screen.getByLabelText('Текст фрагмента 1'), 'Моя первая правка');
+    await user.clear(screen.getByLabelText('Текст фрагмента 2')); await user.type(screen.getByLabelText('Текст фрагмента 2'), 'Моя вторая правка');
+    changed = true; await emit('reset'); await screen.findByTitle('Версия 4');
+    expect(screen.getByLabelText('Текст фрагмента 1')).toHaveValue('Моя первая правка');
+    expect(screen.getByLabelText('Текст фрагмента 2')).toHaveValue('Моя вторая правка');
+    expect(screen.getByLabelText('Текст фрагмента 3')).toHaveValue('Новый s3');
   });
   it('refreshes a stale job without replaying pause or replacing the project ETag', async () => {
     const paused = { ...job, state: 'paused', requestedState: 'pause', phase: 'paused', revision: 9 };
@@ -221,7 +297,7 @@ describe('Persistent generation interface', () => {
     });
     await user.click(await screen.findByRole('button', { name: 'Пауза' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Задание изменено/);
-    expect(screen.getByText('Версия 2')).toBeInTheDocument();
+    expect(screen.getByTitle('Версия 2')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Продолжить задание' }));
     const controls = calls.filter(call => /\/pause$|\/resume$/.test(call.path));
     expect(controls.map(call => new Headers(call.init?.headers).get('If-Match'))).toEqual(['"3"', '"9"']);
@@ -231,7 +307,7 @@ describe('Persistent generation interface', () => {
     await open({ 'GET /api/runtime/readiness': () => ({ body: { ready: false, experimental: false, diagnosticCode: 'worker.runtime.not_ready', profileId: 'q8-f16-cpu' } }) });
     expect(await screen.findByRole('button', { name: 'Проба голоса' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Озвучить выбранные фрагменты' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Обучить голос' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Обучить голос' })).not.toBeInTheDocument();
     expect(await screen.findByText(/Движок озвучивания не настроен/)).toBeInTheDocument();
   });
   it('ignores an older in-flight refresh after a saved edit returns a newer revision', async () => {
@@ -241,17 +317,20 @@ describe('Persistent generation interface', () => {
       'PATCH /api/projects/book1/segments/s1': () => ({ body: { ...project, revision: 5, segments: [{ ...segment, spokenText: 'Сохранённая правка' }, ...project.segments.slice(1)] }, etag: '"5"' }),
     });
     await waitFor(() => expect(reads).toBe(1)); await emit(); await waitFor(() => expect(reads).toBe(2));
-    await user.clear(screen.getByLabelText('Произносимый текст 1')); await user.type(screen.getByLabelText('Произносимый текст 1'), 'Сохранённая правка');
-    await user.click(screen.getByRole('button', { name: 'Сохранить фрагмент 1' })); await screen.findByText('Версия 5');
+    await user.click(screen.getByRole('button', { name: 'Тексты' }));
+    await user.clear(screen.getByLabelText('Текст фрагмента 1')); await user.type(screen.getByLabelText('Текст фрагмента 1'), 'Сохранённая правка');
+    await user.click(screen.getByRole('button', { name: 'Сохранить фрагмент 1' })); await screen.findByTitle('Версия 5');
     await act(async () => { old.resolve({ body: { ...project, revision: 3 }, etag: '"3"' }); });
-    expect(screen.getByText('Версия 5')).toBeInTheDocument();
-    expect(screen.getByLabelText('Произносимый текст 1')).toHaveValue('Сохранённая правка');
+    expect(screen.getByTitle('Версия 5')).toBeInTheDocument();
+    expect(screen.getByLabelText('Текст фрагмента 1')).toHaveValue('Сохранённая правка');
   });
   it('retains pasted text, rights, range, transcript and confirmation across unrelated reset', async () => {
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
     const setup = { ...project, voiceAnchor: null, textDocument: null, segments: [] };
     const { user } = await open({}, setup);
+    await user.click(screen.getByRole('button', { name: 'Добавить текст' }));
     await user.type(screen.getByLabelText('Текст книги'), 'Несохранённая книга');
+    await user.click(screen.getByRole('button', { name: 'Голос' }));
     await user.clear(screen.getByLabelText('Начало, секунды')); await user.type(screen.getByLabelText('Начало, секунды'), '5');
     await user.clear(screen.getByLabelText('Конец, секунды')); await user.type(screen.getByLabelText('Конец, секунды'), '17');
     await user.type(screen.getByLabelText('Точный текст фрагмента'), 'Мой текст'); await user.click(screen.getByLabelText('Прослушал и подтверждаю'));
@@ -265,9 +344,9 @@ describe('Persistent generation interface', () => {
     const { user } = await open({ 'GET /api/projects/book1': () => ++reads === 1 ? { body: project, etag: '"2"' } : late.promise });
     await waitFor(() => expect(reads).toBe(1)); const source = TestEventSource.instances.at(-1)!;
     await emit('job', source); await waitFor(() => expect(reads).toBe(2));
-    await user.click(screen.getByRole('button', { name: '← Все проекты' })); await screen.findByText('Пока нет проектов'); expect(source.closed).toBe(true);
+    await user.click(screen.getByRole('button', { name: '← Все голоса' })); await screen.findByText('Пока нет голосов'); expect(source.closed).toBe(true);
     await act(async () => { late.resolve({ body: { ...project, revision: 10 }, etag: '"10"' }); source.emit('reset'); });
     expect(screen.queryByRole('heading', { name: 'Моя книга' })).not.toBeInTheDocument();
-    expect(screen.getByText('Пока нет проектов')).toBeInTheDocument();
+    expect(screen.getByText('Пока нет голосов')).toBeInTheDocument();
   });
 });

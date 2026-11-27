@@ -19,9 +19,9 @@ internal static class VoxCpmTrainingApiFixture
             services.AddSingleton<IVoxCpmTrainingCheckpointValidator>(new Validator());
             if (!hosted) services.RemoveAll<IHostedService>();
         });
-    internal static async Task<(string Id, string ETag, string VersionId)> ApprovedAsync(ApiTestHost host)
+    internal static async Task<(string Id, string ETag, string VersionId)> ApprovedAsync(ApiTestHost host, int sourceSamples = 480000)
     {
-        var p = await TtsCorpusApiFixture.ProjectAsync(host); var draft = await TtsCorpusApiFixture.DraftAsync(host, p.Id, p.ETag);
+        var p = await TtsCorpusApiFixture.ProjectAsync(host, sourceSamples); var draft = await TtsCorpusApiFixture.DraftAsync(host, p.Id, p.ETag);
         var corpus = host.Services.GetRequiredService<IStudioTtsCorpusService>(); var clip = draft.Clips[0];
         var reviewed = await corpus.UpdateClipAsync(p.Id, draft.Id, clip.Id, draft.Revision, "review", new(clip.Text, false, true), ApiTestHost.Token);
         var approved = await corpus.ApproveAsync(p.Id, draft.Id, reviewed.Revision, "approve", true, ApiTestHost.Token);

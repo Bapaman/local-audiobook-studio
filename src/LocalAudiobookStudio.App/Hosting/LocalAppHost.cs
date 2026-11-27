@@ -3,11 +3,14 @@ using LocalAudiobookStudio.App.Workers;
 using LocalAudiobookStudio.App.TtsCorpus;
 using LocalAudiobookStudio.App.VoxCpmTraining;
 using LocalAudiobookStudio.App.VoxCpmInference;
+using LocalAudiobookStudio.App.Voices;
 using LocalAudiobookStudio.Application.VoxCpmInference;
 using LocalAudiobookStudio.Application.TtsCorpus;
 using LocalAudiobookStudio.Application.VoxCpmTraining;
 using LocalAudiobookStudio.Application.Workers;
 using LocalAudiobookStudio.Application.Training;
+using LocalAudiobookStudio.Application.Voices;
+using LocalAudiobookStudio.Core.Voices;
 using LocalAudiobookStudio.Web.Hosting;
 using LocalAudiobookStudio.Web.Lifetime;
 using LocalAudiobookStudio.Web.Security;
@@ -87,6 +90,10 @@ public static class LocalAppHost
                     services.AddSingleton<IWorkerClientFactory>(provider => new WorkerProcessSupervisor.Factory(
                         provider.GetRequiredService<WorkerRuntimeReadiness>(), TimeProvider.System, new()));
                     if (dependencies.TrainingOptions is { } training) services.AddRvcTraining(training);
+                    if (dependencies.VoiceFfmpeg is { } ffmpeg && File.Exists(ffmpeg))
+                        services.AddSingleton<IVoiceRecordingDecoder>(provider =>
+                            new FfmpegVoiceRecordingDecoder(ffmpeg, Path.Combine(dependencies.Paths.Root, "voice-import"),
+                                provider.GetRequiredService<VoiceRecordingPolicy>()));
                     if (dependencies.TtsCorpusOptions is { } corpus)
                     {
                         services.AddSingleton(_ => new TtsCorpusRuntime(corpus));
@@ -163,6 +170,8 @@ public static class LocalAppHost
                         await VoxCpmTrainingShutdown.WaitForCleanupAsync(vox.DisposeAsync);
                     if (app.Services.GetService<VoxCpmInferenceNativeExecutor>() is { } inference)
                         await VoxCpmInferenceShutdown.WaitForCleanupAsync(inference.DisposeAsync);
+                    if (app.Services.GetService<IVoiceRecordingDecoder>() is FfmpegVoiceRecordingDecoder decoder)
+                        await decoder.FinishAsync();
                     await app.DisposeAsync();
                 }
             }
@@ -201,6 +210,7 @@ internal sealed record LocalAppHostDependencies(
     public RvcTrainingOptions? TrainingOptions { get; init; }
     public TtsCorpusRuntimeOptions? TtsCorpusOptions { get; init; }
     public VoxCpmTrainingRuntimeOptions? VoxCpmTrainingOptions { get; init; }
+    public string? VoiceFfmpeg { get; init; }
 
     public static LocalAppHostDependencies CreateForArguments(string[] args)
     {
@@ -209,8 +219,15 @@ internal sealed record LocalAppHostDependencies(
         RvcTrainingOptions? training = null;
         TtsCorpusRuntimeOptions? corpus = null;
         VoxCpmTrainingRuntimeOptions? vox = null;
+        string? voiceFfmpeg = null;
         while (true)
         {
+            if (args.Length >= 2 && args[^2] == "--voice-ffmpeg")
+            {
+                if (voiceFfmpeg != null) throw new ArgumentException("Duplicate voice decoder options.");
+                voiceFfmpeg = CanonicalLocalRoot(args[^1]);
+                args = args[..^2]; continue;
+            }
             if (args.Length >= 2 && args[^2] == "--voxcpm-training-runtime-config")
             {
                 if (vox != null) throw new ArgumentException("Duplicate VoxCPM training options.");
@@ -236,7 +253,7 @@ internal sealed record LocalAppHostDependencies(
             }
             break;
         }
-        if (args.Length == 0) return CreateDefault() with { WorkerOptions = worker, TrainingOptions = training, TtsCorpusOptions = corpus, VoxCpmTrainingOptions = vox };
+        if (args.Length == 0) return CreateDefault() with { WorkerOptions = worker, TrainingOptions = training, TtsCorpusOptions = corpus, VoxCpmTrainingOptions = vox, VoiceFfmpeg = voiceFfmpeg };
         if ((args.Length != 2 && args.Length != 4) || args[0] != "--synthetic-data-root"
             || (args.Length == 4 && args[2] != "--synthetic-launch-pipe")) throw new ArgumentException("Invalid startup options.");
         string root = CanonicalLocalRoot(args[1]);
@@ -246,7 +263,7 @@ internal sealed record LocalAppHostDependencies(
         string identity = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(paths.Root.ToUpperInvariant())))[..24];
         IExternalBrowser browser = args.Length == 4 ? new SyntheticLaunchBrowser(args[3]) : new ExternalBrowser();
         return new(paths, SingleInstanceCoordinator.DefaultInstanceName + ".Synthetic." + identity,
-            browser, LocalWebHost.Build, SingleInstanceCoordinatorOptions.Default) { WorkerOptions = worker, TrainingOptions = training, TtsCorpusOptions = corpus, VoxCpmTrainingOptions = vox };
+            browser, LocalWebHost.Build, SingleInstanceCoordinatorOptions.Default) { WorkerOptions = worker, TrainingOptions = training, TtsCorpusOptions = corpus, VoxCpmTrainingOptions = vox, VoiceFfmpeg = voiceFfmpeg };
     }
 
     private static RvcTrainingOptions ReadTrainingConfig(string path)

@@ -20,6 +20,7 @@ public sealed class WorkerProcessSupervisor : IWorkerSessionLifetime
     internal bool NativeDisposed { get; private set; }
     internal string PipeName { get; }
     internal byte[] Secret { get; }
+    public bool StopRequested { get { lock (sync) return cleanup != null; } }
 
     private WorkerProcessSupervisor(NativeChild child, string pipeName, byte[] secret, TimeProvider time)
     {
